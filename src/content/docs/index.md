@@ -4,7 +4,7 @@ description: Practical, independent guides for Linux, self-hosting, privacy, and
 template: splash
 hero:
   title: "Build smarter. Own your stack. Question defaults."
-  tagline: "Practical, independent guides for technology, privacy, and healthier decision-making — written to help you understand and control the systems you depend on."
+  tagline: "Practical, independent guides for technology, privacy, and healthier decision-making written to help you understand and control the systems you depend on."
   image:
     alt: RebelRx Tech hero illustration showing a rebellious penguin in a homelab environment
     file: ../../assets/rebelrx-tech-hero.png
@@ -56,7 +56,7 @@ hero:
   <div>
     <p class="rx-eyebrow">Featured guide</p>
     <h2>Build a home lab you actually understand</h2>
-    <p>Move beyond copy-and-paste self-hosting. Learn how the pieces fit together — containers, networking, private access, storage, reverse proxies, and backups.</p>
+    <p>Own your self-hosted infrastructure. Understand how the pieces fit together with containers, networking, private access, storage, reverse proxies, and backups.</p>
   </div>
   <div class="rx-feature-actions">
     <a href="/homelab/docker-home-lab/">Docker home lab</a>
