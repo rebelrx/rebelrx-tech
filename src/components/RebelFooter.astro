@@ -1,0 +1,51 @@
+---
+import DefaultFooter from '@astrojs/starlight/components/Footer.astro';
+---
+
+<DefaultFooter>
+  <slot />
+</DefaultFooter>
+
+<div class="rebel-footer">
+  <span>© 2026 RebelRx Group LLC</span>
+
+  <nav aria-label="Legal">
+    <a href="/privacy-policy/">Privacy</a>
+    <span aria-hidden="true">·</span>
+    <a href="/terms-of-service/">Terms</a>
+    <span aria-hidden="true">·</span>
+    <a href="/disclaimer/">Disclaimer</a>
+  </nav>
+</div>
+
+<style>
+  .rebel-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.5rem;
+
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+
+    border-top: 1px solid var(--rx-border);
+
+    color: var(--sl-color-gray-3);
+    font-size: 0.8rem;
+  }
+
+  .rebel-footer nav {
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  .rebel-footer a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .rebel-footer a:hover {
+    color: var(--sl-color-text-accent);
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+  }
+</style>

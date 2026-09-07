@@ -7,6 +7,11 @@ export default defineConfig({
     starlight({
       title: 'RebelRx Tech',
       description: 'Practical guides for Linux, self-hosting, privacy, and evidence-aware health education.',
+      
+      components: {
+        Footer: './src/components/RebelFooter.astro',
+      },
+      
       logo: {
         src: './src/assets/rebelrxlogo.svg',
         alt: 'RebelRx',

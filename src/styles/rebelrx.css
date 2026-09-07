@@ -560,27 +560,6 @@ body {
   background: #eeeeee;
 }
 
-
-/* ---------------------------------------------------------
-   Footer
-   --------------------------------------------------------- */
-
-footer {
-  border-top: 1px solid var(--rx-border);
-}
-
-footer::after {
-  content: '© 2026 RebelRx Group LLC · Privacy · Terms · Disclaimer';
-
-  display: block;
-  padding-top: 1rem;
-
-  color: var(--sl-color-gray-3);
-
-  font-size: 0.8rem;
-}
-
-
 /* ---------------------------------------------------------
    Responsive
    --------------------------------------------------------- */
