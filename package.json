@@ -1,0 +1,19 @@
+{
+  "name": "rebelrx-tech",
+  "version": "2.4.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "latest",
+    "astro": "latest"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
