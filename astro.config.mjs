@@ -18,9 +18,6 @@ export default defineConfig({
       ],
       customCss: ['./src/styles/rebelrx.css'],
       lastUpdated: true,
-      editLink: {
-        baseUrl: 'https://github.com/rebelrx/docs/edit/main/',
-      },
       sidebar: [
         { label: 'Linux', items: [
           { label: 'Overview', link: '/linux/' },
