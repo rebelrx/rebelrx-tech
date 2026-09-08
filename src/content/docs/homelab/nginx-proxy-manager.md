@@ -3,9 +3,9 @@ title: "🔀 Nginx Proxy Manager (Private HTTPS for Everything)"
 description: >-
   Nginx Proxy Manager for a private homelab — clean HTTPS names for every service, wildcard certificates with zero exposed ports via DNS-01, and local DNS with AdGuard Home.
 ---
-Ports and IP addresses don't scale. `http://192.0.2.20:8096` works for one service; by service ten it's a memory game, every browser screams "Not Secure," and nothing has TLS.
+Ports and IP addresses don't scale. While `http://192.0.2.20:8096` may work for one service; by service ten it's a memory game, every browser screams "Not Secure," and nothing has TLS.
 
-A reverse proxy fixes all of it: **one entry point, real HTTPS, clean names** — `https://jellyfin.home.example.com` — without exposing a single port to the internet.
+A reverse proxy fixes this: **one entry point, real HTTPS, clean names** — `https://jellyfin.home.example.com` — without exposing a single port to the internet.
 
 ---
 
@@ -18,7 +18,7 @@ A reverse proxy fixes all of it: **one entry point, real HTTPS, clean names** �
 ## 🧭 How the Pieces Fit
 
 ```text
-Browser (on the tailnet)
+Browser (on the Tailscale tailnet)
    │
    ▼  "jellyfin.home.example.com?"
 Local DNS (AdGuard Home)  →  answers with your server's IP
@@ -137,7 +137,7 @@ Now NPM can reach `jellyfin:8096` directly, and you can **remove the service's p
 
 ## 🔐 Wildcard Certificate with Zero Exposed Ports (DNS-01)
 
-The usual Let's Encrypt flow (HTTP-01) requires port 80 open to the internet — exactly what this setup refuses to do. The **DNS-01 challenge** proves domain ownership through a DNS record instead, so issuance needs no inbound public port. DNS, ACME, and provider API access still require outbound connectivity. Bonus: it's the only challenge type that can issue **wildcard** certs.
+The usual Let's Encrypt flow (HTTP-01) requires port 80 open to the internet which we try to avoid. The **DNS-01 challenge** proves domain ownership through a DNS record instead, so issuance needs no inbound public port. DNS, ACME, and provider API access still require outbound connectivity. Bonus: it's the only challenge type that can issue **wildcard** certs.
 
 ### 1. Create a DNS API Token
 
@@ -244,7 +244,7 @@ is maddeningly vague — pages load but nothing updates. Enable it for applicati
 
 ## 🚫 What Not To Do
 
-- Don't forward ports 80/443 on your router "just to make certs easier" — DNS-01 exists precisely so you don't have to
+- Don't forward ports 80/443 on your router "just to make certs easier": DNS-01 exists precisely so you don't have to
 - Don't use `.local`, `.lan`, or a made-up TLD — you'll fight mDNS conflicts and can never get real certificates; a real domain costs less than a coffee per month
 - Don't expose the admin UI (`:81`) beyond localhost/Tailscale
 - Don't proxy the admin panels of infrastructure (Portainer, Dockge, NPM itself) with the same casualness as media apps — infrastructure control planes deserve stricter access, not prettier URLs

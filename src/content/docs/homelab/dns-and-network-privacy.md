@@ -17,9 +17,19 @@ DNS filtering is an excellent foundation because it protects devices that cannot
 
 ---
 
-## 🧭 The Design Goal
+## 🌐 What is DNS
 
-The objective is not to create the most complicated network possible.
+DNS stands for Domain Name System. It is the communication protocol that serves as the "phonebook" for the Internet and world wide web. DNS translates machine-readable, web IP addresses (e.g., 142.250.72.14) into human-readable domain names (e.g., www.google.com). 
+
+Every device and website connected to the internet has it's own IP address on a server/network. If someone wants to access that device or page, it requires a system to access and retrieve that device, much like a library. In order to make the web more friendly for users, DNS translates an easy to remember hostname (e.g., www.example.com) to the actual device or site IP (e.g., 192.168.1.1). This is an oversimplification of DNS, as there are many backend steps required with different DNS servers, but this is essentially how DNS resolves sites for users to access websites both on external and internal networks.
+
+> DNS is an essential component of Internet functionality, enabling web browsers to load internet resources by resolving the address entered by the user into the correct destination for data retrieval.
+
+---
+
+## 🧭 The Design Goal for Home DNS
+
+The objective is not to create the most complicated home network possible.
 
 It is to make the answers to these questions obvious:
 
@@ -1145,10 +1155,10 @@ Good network privacy is not measured by the number of blocked domains on a dashb
 
 It comes from **reducing unnecessary trust**:
 
-- Devices should use DNS policy you understand.
-- Low-trust devices should not have unrestricted access to high-value systems.
-- Administrative interfaces should remain private.
-- Remote access should be authenticated and encrypted.
-- Public exposure should be intentional rather than convenient.
+- Devices should use DNS policy you understand
+- Low-trust devices should not have unrestricted access to high-value systems
+- Administrative interfaces should remain private
+- Remote access should be authenticated and encrypted
+- Public exposure should be intentional rather than convenient
 
 DNS filtering is one of the easiest and most effective layers to add, but its real value appears when it becomes part of a broader architecture built around **least privilege, visibility, redundancy, and deliberate trust**.

@@ -6,7 +6,7 @@ description: >-
 
 A Docker homelab stays maintainable only when every stack follows the same operational rules.
 
-This guide defines the **RebelRx Docker infrastructure standard**: a Compose-first approach built around reproducible configuration, durable application data, detailed documentation, deliberate upgrades, and Git as the source of truth.
+This guide defines a recommended approach to **Docker infrastructure standard**: a Compose-first approach built around reproducible configuration, durable application data, detailed documentation, deliberate upgrades, and Git as the source of truth. You can choose to organize your infrastructure however you like; this is just a recommended path to stay consistent and easy to manage.
 
 It complements the [Docker Homelab guide](/homelab/docker-home-lab/), which covers installing and operating Docker itself. This page focuses on **how individual stacks should be structured, documented, reviewed, deployed, upgraded, and recovered**.
 
@@ -110,8 +110,8 @@ A stack is an **operational unit**, not necessarily a single container.
 For example, an application may legitimately contain:
 
 - Web application
-- PostgreSQL
-- Redis
+- Database (e.g., PostgreSQL)
+- Cache (e.g., Redis)
 - Worker
 - Scheduler
 
@@ -148,6 +148,8 @@ A predictable filename simplifies:
 - Validation
 - Repository searches
 - Migrations between hosts
+
+> 💡 For more information on Docker Compose, refer to the official [Docker Docs](https://docs.docker.com/compose/)
 
 ---
 
@@ -312,7 +314,7 @@ compose.yaml
 README.md
 ```
 
-A variable should never be:
+A variable should not be:
 
 - Required by Compose but missing from `.env.example`
 - Documented in the README but no longer used

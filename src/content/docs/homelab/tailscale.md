@@ -5,7 +5,7 @@ description: >-
 ---
 A practical guide to reaching your homelab from anywhere **without opening a single port** to the internet.
 
-Most Tailscale guides assume systemd. This one covers **Devuan (sysvinit)** for your server — where Tailscale ships no init support at all — plus the OpenRC setup for Artix desktops.
+Most Tailscale guides assume systemd and those guides are readily available. This one covers **Devuan (sysvinit)** for your server, where Tailscale ships no init support at all, plus the OpenRC setup for Artix desktops.
 
 ---
 
@@ -26,7 +26,7 @@ Tailscale builds a private mesh network (a "tailnet") between your devices using
 - Traffic is end-to-end encrypted between your devices
 - Works through NAT and firewalls with zero router configuration
 
-> Your server, laptop, and phone behave as if they're on the same LAN — from anywhere.
+> Your server, laptop, and phone behave as if they're on the same LAN from anywhere.
 
 ---
 
@@ -40,7 +40,7 @@ Tailscale is not fully self-hosted by default. Understand what you're trusting:
 | Encryption (WireGuard) | Open source, end-to-end |
 | Coordination server | **Hosted by Tailscale Inc. (closed source)** |
 
-The coordination server only exchanges public keys and connection metadata — it **cannot decrypt your traffic**. But it does see which devices exist and when they connect.
+The coordination server only exchanges public keys and connection metadata; it **cannot decrypt your traffic**. But it does see which devices exist and when they connect.
 
 :::tip[Full sovereignty option: Headscale]
 [Headscale](https://github.com/juanfont/headscale) is an open-source, self-hostable
@@ -289,7 +289,9 @@ Now your phone on cellular can reach devices on the approved subnet devices as i
 
 ## 🚪 Exit Node (Optional)
 
-An exit node routes **all** of a device's internet traffic through your home connection — useful on hotel or airport Wi-Fi.
+An exit node routes **all** of a device's internet traffic through your device's connection which is useful when traveling, particularly on hotel or airport Wi-Fi.
+
+A real-world example: you set your Apple TV at home with Tailscale installed as an exit node. While traveling to another country connected to public Wi-Fi at a local internet cafe, your phone's connection is routed securely through your Apple TV so your traffic and location can't be sniffed by the local ISP or public scammers. 
 
 On the server:
 

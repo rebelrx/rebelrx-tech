@@ -96,11 +96,11 @@ Linux is not “free” in the way people think.
 
 You are trading:
 
-| Convenience        | Control        |
-| ------------------ | -------------- |
-| Plug-and-play apps | Manual setup   |
-| Vendor support     | Self-reliance  |
-| Familiar UX        | Learning curve |
+| Convenience                          | Control        |
+| ------------------------------------ | -------------- |
+| Plug-and-play apps                   | Manual setup   |
+| Vendor support                       | Self-reliance  |
+| Familiar user experience (UX)        | Learning curve |
 
 > Linux rewards those willing to understand their system.
 
@@ -189,7 +189,7 @@ Within a short time, the CLI becomes:
 - More precise and repeatable  
 - A core advantage of using Linux  
 
-> The goal is not to memorize commands, but to understand how the system works.
+> The goal is not to just memorize commands, but to understand how the system works.
 :::
 ---
 
@@ -214,22 +214,38 @@ The Package Manager is how Linux installs software.
 
 Instead of downloading `.exe` files (like in Windows):
 
-* You install from repositories
+* You install from repositories, a centralized remote storage location that contains pre-compiled software packages for various distributions.
 
 Examples:
 
 * `apt` → Debian / Devuan
 * `pacman` → Arch / Artix
+* `dnf` → Fedora
 
-Example command in Devuan to install the app, Nginx (used for web serving):
+Example commands to install the command-line utility app, Wget (used to download files from the internet) in:
+
+Debian / Devuan
 
 ```bash
-sudo apt install nginx
+sudo apt install wget
+```
+Arch / Artix
+
+```bash
+sudo pacman -S wget
+```
+
+Fedora
+
+```bash
+sudo dnf install wget
 ```
 
 ---
 
 ### 🧩 Distribution (Distro)
+
+Linux is technically a family of free and open-source software operating systems based on the Linux kernel.
 
 Distributions (or distros) are different “flavors” of Linux.
 
@@ -239,27 +255,28 @@ Each distro includes:
 * Default tools
 * System philosophy
 
+Distros include the kernel alongside supporting system software and libraries developed by third parties to create a complete operating system.
+
 Examples:
 
-* Devuan → stable, server-focused, no systemd
-* Artix → Arch-based, flexible, no systemd
+* Debian-based using the apt package manager → Debian, Devuan, Ubuntu, Linux Mint, Pop!_OS 
+* RPM-based using the DNF package manager → Fedora, Red Hat Enterprise Linux, Rocky Linux
+* Arch-based using the pacman package manager → Arch, Artix, CachyOS, EndeavorOS
 
-> Linux is not just one OS; it is a family of systems.
+> 💡 A comprehensive list and popularity ranking of Linux distros are available at [DistroWatch](https://distrowatch.com/dwres.php?resource=major)
 
 ---
 
 ### ⚙️ Init System
 
-The system that starts everything at boot.
+The system that starts everything at boot, responsible for initializing the system, managing services, and supervising all other processes. 
+
+The init system acts as the "conductor" of the OS, handling core functions such as process supervision, service management, and logging/monitoring.
 
 Examples:
 
 * `systemd` → dominant, centralized
 * `OpenRC`, `runit`, `s6` → simpler, modular
-
-RebelRx Linux Guides prioritize:
-
-> Non-systemd systems for greater transparency and control.
 
 ---
 
@@ -308,7 +325,7 @@ Example:
 * A USB drive might appear at: `/media/usb-drive`
 * A mounted NAS might be: `/mnt/nas`
 
-> You don’t switch drives—you navigate a single tree.
+> You don’t switch drives; you navigate a single tree.
 
 ---
 
@@ -510,7 +527,7 @@ Always:
 - Double-check selected disks and partitions  
 - Understand whether you are replacing or dual-booting  
 
-> Partitioning is powerful—but it assumes you know what you're doing.
+> Partitioning is powerful, but it assumes you know what you're doing.
 :::
 ---
 
@@ -573,11 +590,6 @@ If this aligns with your goals:
 * Start with a guided install
 * Accept the learning curve
 * Build your system deliberately
-
-👉 Continue to:
-
-* [Artix Desktop Manual Install](/linux/artix-kde-openrc-install/)
-* [Devuan Server Install](/linux/devuan-server-install/)
 
 ## 🔗 Choose Your Installation Guide
 

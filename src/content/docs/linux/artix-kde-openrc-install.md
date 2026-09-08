@@ -3,7 +3,7 @@ title: "Artix Linux Manual Installation Guide"
 description: >-
   Step-by-step manual installation of Artix Linux with OpenRC, Btrfs subvolumes, zram, and KDE Plasma on AMD hardware.
 ---
-**Target:** PC / Laptop (AMD Ryzen processor and AMD GPU)
+**Target Machine:** PC / Laptop (assuming AMD CPU and AMD GPU)
 
 **Filesystem:** Btrfs with subvolumes
 
@@ -541,7 +541,13 @@ For AMD GPUs, install the Mesa drivers:
 pacman -S mesa vulkan-radeon libva-mesa-driver mesa-utils
 ```
 
-For NVIDIA hardware, use the current Artix packages appropriate to your GPU generation and kernel. The 32-bit libraries are optional for 32-bit applications such as Steam, not a prerequisite for the base driver. This AMD-focused install does not validate every NVIDIA driver branch.
+For NVIDIA hardware, use the current Artix packages appropriate to your GPU generation and kernel. The 32-bit libraries are optional for 32-bit applications such as Steam, not a prerequisite for the base driver. This AMD-focused install does not validate every NVIDIA driver branch. Additional steps may be required so look up instructions specific to your NVIDIA GPU.
+
+NVIDIA packages on most modern systems: 
+
+```bash
+pacman -S nvidia-open-dkms nvidia-utils nvidia-settings lib32-nvidia-utils   
+```
 
 * * *
 

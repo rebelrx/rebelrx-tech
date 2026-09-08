@@ -47,7 +47,7 @@ export default defineConfig({
                   link: '/linux/artix-kde-openrc-install/',
                 },
                 {
-                  label: 'Fedora 44 KDE',
+                  label: 'Fedora KDE',
                   link: '/linux/fedora-kde-install/',
                 },
               ],
@@ -61,7 +61,7 @@ export default defineConfig({
                   link: '/linux/devuan-server-install/',
                 },
                 {
-                  label: 'Debian 13 Server',
+                  label: 'Debian Server',
                   link: '/linux/debian-server-install/',
                 },
               ],

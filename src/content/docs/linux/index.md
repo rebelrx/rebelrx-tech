@@ -17,7 +17,7 @@ This section focuses on:
 ## 🧭 What You'll Find Here
 
 - **Preferred Non-systemd Installs** → Artix desktop and Devuan server
-- **Mainstream Reference Installs** → Fedora KDE desktop and Debian server
+- **Mainstream Reference Installs** → Fedora desktop and Debian server
 - **Post-Install Configuration** → Security, firmware, remote access, storage, backups, and operational checks
 - **System Philosophy** → Why the operating system and init choices matter
 
@@ -29,19 +29,37 @@ This section focuses on:
 
 ---
 
-## 🚫 Why RebelRx Prefers Non-systemd Linux
+## 🚫 Why Avoid systemd
 
-Modern Linux distributions have largely standardized around **systemd** as their init and service-management platform.
+Modern Linux distributions ("distros") have largely standardized around **systemd** as their init and service-management platform.
 
-RebelRx generally prefers non-systemd distributions where practical because they preserve a more modular Unix-style design and reduce dependence on one deeply integrated system-management layer.
+Why avoid the general, mainstream de-facto init system?
 
-The preferred paths here are:
+Because systemd represents a shift toward:
+
+- Centralization of core system control
+- Deep integration across system components
+- Reduced transparency compared to traditional UNIX-style init systems
+
+More importantly, it introduces a layer where external control mechanisms can be embedded at scale.
+
+This includes the growing global push toward:
+
+- Age verification systems
+- Identity-linked access controls
+- Device-level enforcement mechanisms
+
+Operating systems are becoming enforcement layers. And systemd is the most likely insertion point within Linux.
+
+Many brave and pioneering developers in the Linux community have called out systemd, and recommend non-systemd distributions where practical because they preserve a more modular Unix-style design and reduce dependence on one deeply integrated system-management layer.
+
+The preferred paths for non-systemd distros here are:
 
 ### 🔹 Artix Linux (Arch-based)
 
 - No systemd
 - Rolling release
-- OpenRC, runit, s6, or dinit options
+- Choice of init options including OpenRC, runit, s6, or Dinit
 - Highly configurable
 - Excellent for users who want to understand and control the desktop stack
 
@@ -49,6 +67,7 @@ The preferred paths here are:
 
 - No systemd
 - Stable release model
+- Uses the traditional Linux init, SysVinit
 - Familiar Debian ecosystem
 - Excellent for servers and long-term deployments
 
@@ -71,7 +90,6 @@ They are included because:
 - Hardware and software vendors commonly target them
 - Troubleshooting information is abundant
 - Many users will encounter them professionally
-- RebelRx currently operates both distributions on real hardware
 
 The distinction is deliberate:
 
@@ -91,7 +109,7 @@ Best for:
 - Learning the system
 - Non-systemd desktop builds
 
-### [Fedora 44 KDE Plasma Desktop](/linux/fedora-kde-install/)
+### [Fedora KDE Plasma Desktop](/linux/fedora-kde-install/)
 
 Fedora's graphical installer and defaults, followed by RPM Fusion, AMD/NVIDIA configuration, privacy cleanup, and practical workstation setup.
 
@@ -116,9 +134,9 @@ Best for:
 - Docker hosts
 - Long-lived infrastructure
 
-### [Debian 13 Server Installation](/linux/debian-server-install/)
+### [Debian Server Installation](/linux/debian-server-install/)
 
-Mainstream Debian Trixie server with systemd, ext4, SSH, Docker's official repository, Tailscale, NAS storage, and optional NVIDIA support.
+Mainstream Debian 13 ("Trixie") server with systemd, ext4, SSH, Docker's official repository, Tailscale, NAS storage, and optional NVIDIA support.
 
 Best for:
 
@@ -152,8 +170,8 @@ A distro-neutral checklist covering:
 
 | Goal | Recommended starting point |
 | :--- | :--- |
-| Non-systemd KDE desktop | **Artix** |
-| Mainstream/current-hardware KDE desktop | **Fedora** |
+| Non-systemd modern desktop | **Artix** |
+| Mainstream/current-hardware modern desktop | **Fedora** |
 | Non-systemd stable server | **Devuan** |
 | Mainstream/reference server | **Debian** |
 
@@ -167,4 +185,6 @@ The right choice depends on what you are optimizing for: independence, support, 
 
 Convenience and control are often in tension.
 
-This section documents both ends honestly: the systems RebelRx prefers **and** the mainstream systems worth knowing well.
+There are other Linux distros and desktop styles available as well. All are available for experimentation.
+
+But, this section tries to document both ends honestly: the preferred independent, de-centralized systems **and** the mainstream systems worth knowing well.

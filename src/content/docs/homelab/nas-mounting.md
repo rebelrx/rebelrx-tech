@@ -3,7 +3,9 @@ title: "🗂️ Mounting NAS Storage (Devuan)"
 description: >-
   Mount NAS storage on a Devuan server the right way — NFS vs SMB, fstab entries that survive reboots without systemd, Docker ordering gotchas, and the SQLite-over-NFS mistake that corrupts homelab databases.
 ---
-Your NAS holds the bulk storage; your server runs the services. This guide connects them **reliably**: mounts that survive reboots, behave under sysvinit, and don't silently feed empty directories to your Docker containers.
+Your Network Area Storage (NAS) device holds the bulk storage; your server runs the services. This guide connects them **reliably**: mounts that survive reboots, behave under sysvinit, and don't silently feed empty directories to your Docker containers.
+
+This guide uses Devuan as the OS since there aren't many guides available, but the same concepts can be applied to any other Linux distro.
 
 ---
 
@@ -25,13 +27,13 @@ Both work. Pick based on what's talking to what:
 | Auth model | Often AUTH_SYS + export restrictions; Kerberos is also supported | Username + password |
 | Verdict | **Default choice for a Linux homelab** | Use when NFS isn't available or Windows shares the data |
 
-This guide covers both — NFS as the primary path.
+This guide covers both, but NFS as the primary path.
 
 ---
 
 ## 🖥️ NAS-Side Prep
 
-On the NAS (QNAP, Synology, TrueNAS — the UI differs, the concepts don't):
+On the NAS (e.g., QNAP, Synology, TrueNAS) the UI may differ, but the concepts don't:
 
 1. Create or pick the shared folder (e.g., `media`, `backups`)
 2. Enable the **NFS service** and add an NFS rule for the share:
@@ -62,7 +64,7 @@ sudo apt install -y cifs-utils
 
 ## 🧪 Test Mount First (Always)
 
-Never go straight to `fstab`. Prove the mount works interactively:
+Don't go straight to `fstab`. Prove the mount works interactively:
 
 ```bash
 # NFSv3-style export discovery; NFSv4-only servers may not support showmount
@@ -232,6 +234,6 @@ The rule from the [Docker guide](/homelab/docker-home-lab/) already handles this
 
 A NAS you can't reliably reach is just a very expensive space heater.
 
-Get the mounts boring — tested, pinned, ordered, guarded — and the rest of the homelab gets to build on storage it never has to think about.
+Get the mounts boring, tested, pinned, ordered, guarded, and the rest of the homelab gets to build on storage it never has to think about.
 
 > Boring storage is the foundation everything else stands on.

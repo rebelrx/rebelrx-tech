@@ -3,7 +3,7 @@ title: "Debian 13 Server Installation Guide"
 description: >-
   Step-by-step Debian 13 Trixie server installation with systemd, ext4, SSH, automatic security updates, Tailscale, Docker Engine, NAS mounts, and optional NVIDIA support.
 ---
-**Target:** PC / Workstation / Server (AMD CPU; optional NVIDIA GPU)
+**Target Machine:** PC / Workstation / Server (AMD CPU; optional NVIDIA GPU)
 
 **Filesystem:** ext4
 
@@ -17,7 +17,7 @@ description: >-
 
 This guide is the mainstream systemd counterpart to the [Devuan Server Installation Guide](/linux/devuan-server-install/).
 
-RebelRx prefers Devuan where avoiding systemd is the priority. Debian is included because it remains one of the most important Linux server standards, has an enormous software ecosystem, and is a sensible reference platform for self-hosted infrastructure.
+Devuan is recommended where avoiding systemd is the priority. Debian is included because it remains one of the most important Linux server standards, has an enormous software ecosystem, and is a sensible reference platform for self-hosted infrastructure. Debian is the distro you'll find most often in smaller enterprise server systems not requiring commercial support.
 
 Official installation documentation:
 
@@ -31,11 +31,11 @@ Official installation documentation:
 
 Recommended firmware settings:
 
-- UEFI enabled
-- Legacy/CSM disabled unless specifically required
-- SVM/AMD-V or Intel VT-x enabled
-- IOMMU enabled if PCIe passthrough may be used
-- Secure Boot may remain enabled for a normal Debian install
+- **UEFI** enabled
+- **Legacy/CSM** disabled unless specifically required
+- **SVM/AMD-V** or **Intel VT-x** enabled
+- **IOMMU** enabled if PCIe passthrough may be used
+- **Secure Boot** may remain enabled for a normal Debian install, but you can disable it if needed
 - Update BIOS/UEFI firmware before installation when practical
 
 For an NVIDIA server, whether Secure Boot remains enabled depends on how the proprietary kernel module will be installed and signed. Do not disable it reflexively; decide based on the actual driver workflow.
@@ -311,7 +311,7 @@ Test key-based login **before** disabling passwords.
 Create a small drop-in instead of heavily editing the vendor file:
 
 ```bash
-sudo nano /etc/ssh/sshd_config.d/00-rebelrx.conf
+sudo nano /etc/ssh/sshd_config.d/00-hostname.conf
 ```
 
 Example:
@@ -498,7 +498,7 @@ A user who can control the Docker daemon can effectively gain root-level control
 
 ## 🐳 19. Docker Directory Layout
 
-For RebelRx-style hosts, keep stack definitions separate from persistent runtime data:
+For cleaner and more organized hosts, keep stack definitions separate from persistent runtime data:
 
 ```text
 /opt/docker/stacks/<stack>/
@@ -737,6 +737,6 @@ A clean Debian 13 server should have:
 
 ## 🧠 Final Thought
 
-Debian is deliberately boring — and that is exactly why it is a server standard.
+Debian prioritizes rigorous testing and stability, making it a preferred choice for servers and mission-critical systems.
 
-If the goal is maximum independence from systemd, use Devuan. If the goal is a mainstream, predictable, exceptionally well-supported Linux server baseline, Debian remains one of the strongest choices available.
+If the goal is maximum independence from systemd, use Devuan, which is essentially Debian running on sysvinit instead of systemd. If the goal is a mainstream, predictable, exceptionally well-supported Linux server baseline, Debian remains one of the strongest choices available.

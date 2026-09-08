@@ -28,7 +28,7 @@ Install and operate a Compose-first homelab on bare-metal Linux.
 
 ### [Docker Infrastructure Standards](/homelab/docker-infrastructure-standards/)
 
-The conventions that keep multiple hosts and dozens of stacks maintainable: directory layout, `.env.example`, Compose validation, documentation, updates, and backups.
+The conventions that keep multiple hosts and dozens of stacks maintainable: directory layout, environment variables, Compose validation, documentation, updates, and backups.
 
 ### [Git-Managed Homelab](/homelab/git-managed-homelab/)
 
@@ -44,7 +44,7 @@ Private remote access without exposing administrative services directly to the I
 
 ### [DNS & Network Privacy](/homelab/dns-and-network-privacy/)
 
-AdGuard Home/Pi-hole concepts, upstream DNS, browser DoH, IoT segmentation, and the real limits of DNS blocking.
+AdGuard Home/Pi-hole concepts, upstream DNS, browser DNS over HTTPS (DoH), Internet of Things (IoT) segmentation, and the real limits of DNS blocking.
 
 ### [Nginx Proxy Manager](/homelab/nginx-proxy-manager/)
 
@@ -90,7 +90,7 @@ Host reachability, system metrics, Docker management, service health, storage ca
 
 ## 🧱 Design Philosophy
 
-RebelRx Homelab is built around:
+Homelab is built around:
 
 - Local-first infrastructure
 - Minimal external dependencies
@@ -133,7 +133,6 @@ If you are building from scratch:
 
 - Self-Hosted Retro Gaming with RomM
 - Home Assistant infrastructure integration
-- Reverse-proxy and identity architecture
 
 ---
 

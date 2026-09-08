@@ -3,11 +3,11 @@ title: "📊 Homelab Monitoring & Management"
 description: >-
   A practical monitoring and management strategy for Docker hosts, storage, services, GPUs, backups, network reachability, and Home Assistant dashboards without unnecessary observability complexity.
 ---
-A homelab can become surprisingly complex long before it becomes "enterprise." Multiple hosts, containers, NAS systems, GPUs, backups, reverse proxies, DNS servers, and remote-access services all introduce their own failure modes.
+A homelab can become complex long before it becomes "enterprise." Multiple hosts, containers, NAS systems, GPUs, backups, reverse proxies, DNS servers, and remote-access services all introduce their own failure modes.
 
 The goal of monitoring is not to collect the most metrics or build the busiest dashboard. It is to answer a much simpler question quickly:
 
-> **What is broken, degraded, full, hot, slow, unreachable, or at risk — and do I need to care right now?**
+> **What is broken, degraded, full, hot, slow, unreachable, or at risk and do I need to care right now?**
 
 A good monitoring system reduces uncertainty. A bad one generates noise.
 
@@ -181,7 +181,7 @@ For an important wired server, something on the order of a few minutes is usuall
 
 ## 📈 4. Host Metrics With Glances
 
-[Glances](https://github.com/nicolargo/glances) is an excellent fit for interactive homelab monitoring because it exposes a large amount of useful host information without requiring a full metrics stack.
+[Glances](https://github.com/nicolargo/glances) is a useful tool for interactive homelab monitoring because it exposes a large amount of useful host information without requiring a full metrics stack.
 
 Typical metrics include:
 
@@ -194,26 +194,6 @@ Typical metrics include:
 - process activity
 - sensors and temperatures where supported
 - Docker statistics when configured
-
-### What Glances is especially good at
-
-Glances is useful when you already know that something feels wrong and want to answer questions quickly:
-
-- Why is the server slow?
-- Which process is consuming RAM?
-- Is a backup saturating disk I/O?
-- Is network throughput unusually high?
-- Is the root filesystem filling?
-
-It is an operational diagnostic tool first.
-
-### What Glances should not be
-
-Do not make Glances your only alerting or historical system.
-
-If the server is unreachable, the monitoring application running on that same server cannot reliably notify you that the server is unreachable.
-
-Use independent reachability checks for critical systems.
 
 ---
 

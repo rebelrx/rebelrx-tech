@@ -41,11 +41,11 @@ For this Docker host, I prefer bare metal because it reduces the number of layer
 
 - PC or Laptop
 - Internet access
-- Devuan
+- Linux OS installed (in this guide, Devuan)
 
 If you don't have a dedicated PC, you can purchase one of these inexpensive mini PC boxes that includes RAM and SSD to get started right away: [Beelink Mini S12](https://www.amazon.com/dp/B0BW8JSQCH)
 
-If you don't have Devuan installed, see the [Devuan Linux Server Install Guide](/linux/devuan-server-install/)
+If you don't have Linux installed, see the [Devuan Linux Server Install Guide](/linux/devuan-server-install/)
 
 ---
 

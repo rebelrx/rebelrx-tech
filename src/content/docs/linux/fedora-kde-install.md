@@ -3,7 +3,7 @@ title: "Fedora 44 KDE Plasma Desktop Installation Guide"
 description: >-
   Step-by-step Fedora 44 KDE Plasma Desktop installation with Fedora's graphical installer, Btrfs defaults, RPM Fusion, AMD/NVIDIA notes, privacy cleanup, and practical post-install configuration.
 ---
-**Target:** PC / Laptop (hardware-neutral; AMD and NVIDIA sections included)
+**Target Machine:** PC / Laptop (hardware-neutral; AMD and NVIDIA sections included)
 
 **Filesystem:** Fedora default Btrfs layout
 
@@ -17,7 +17,7 @@ description: >-
 
 Fedora KDE Plasma Desktop is one of the best mainstream Linux desktop choices when you want a modern kernel, current hardware support, a polished KDE experience, and strong upstream defaults without building the system manually.
 
-RebelRx generally prefers non-systemd Linux where practical. Fedora is included because it is a major upstream distribution, an important reference platform for modern Linux, and an excellent choice for newer desktop/workstation hardware.
+Non-systemd Linux are generally recommended where practical. Fedora is included because it is a major upstream distribution, an important reference platform for modern Linux, and an excellent choice for newer desktop/workstation hardware.
 
 Official downloads and documentation:
 
@@ -31,7 +31,7 @@ Official downloads and documentation:
 
 ## 🧭 1. Before You Begin
 
-Recommended firmware settings:
+Recommended firmware/BIOS settings:
 
 - Use **UEFI**, not Legacy/CSM mode
 - Enable **SVM/AMD-V** or **Intel VT-x** if you use virtualization
@@ -40,6 +40,8 @@ Recommended firmware settings:
 - Update the motherboard/laptop firmware before installing when practical
 
 Back up anything important before repartitioning or replacing an existing OS.
+
+For an NVIDIA server, whether Secure Boot remains enabled depends on how the proprietary kernel module will be installed and signed. Do not disable it reflexively; decide based on the actual driver workflow.
 
 :::tip[Keep Fedora simple]
 Unlike the Artix manual installation, the point of this guide is not to rebuild Fedora's defaults by hand. Fedora's installer, Btrfs layout, zram configuration, SELinux policy, and firewall defaults are all sensible. Start with those defaults and customize only where there is a clear benefit.
@@ -478,7 +480,7 @@ The strongest privacy improvement is usually not a hidden tweak. It is reducing 
 
 ## 🧭 18. Browser
 
-For a privacy-oriented daily browser, RebelRx uses **Brave**.
+For a privacy-oriented daily browser, you can use **Brave**.
 
 Install from Brave's current official Linux repository instructions:
 
@@ -540,7 +542,7 @@ For detailed design and access-control guidance, see the [Tailscale guide](/home
 
 ## 🧭 21. VSCodium
 
-For a VS Code-compatible editor without Microsoft's telemetry defaults, RebelRx uses **VSCodium**.
+For a VS Code-compatible editor without Microsoft's telemetry defaults, you can use **VSCodium**.
 
 Use the project's current Fedora/RPM repository instructions:
 
@@ -552,7 +554,7 @@ Use the project's current Fedora/RPM repository instructions:
 
 ## 🐳 22. Docker (Optional)
 
-A desktop workstation does not automatically need Docker. Install it only if you actually develop, test, or run containers locally.
+A desktop workstation does not automatically need Docker. Install it only if you plan to self-host or actually develop, test, or run containers locally.
 
 Use Docker's official Fedora repository:
 
@@ -669,6 +671,4 @@ A clean Fedora KDE workstation should end up with:
 
 ## 🧠 Final Thought
 
-Fedora is not the RebelRx choice for maximum init-system independence. It **is** one of the best mainstream reference Linux desktops: modern, well maintained, close to upstream, and exceptionally good for current workstation hardware.
-
-Use Fedora's strengths instead of fighting its defaults.
+Fedora is not the choice for maximum init-system independence. It **is** one of the best mainstream reference Linux desktops though: modern, stable, secure, well maintained, close to upstream, and exceptionally good for current workstation hardware. Linus Torvalds himself (the creator of Linux) has joked if he were emperor, everyone would be forced to use Fedora.

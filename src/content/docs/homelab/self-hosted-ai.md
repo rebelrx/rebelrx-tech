@@ -78,7 +78,7 @@ Characteristics:
 - Privacy matters
 - Models should remain loaded when possible
 
-A simple runtime such as **Ollama** is often ideal here.
+A simple runtime such as **Ollama** is often ideal here to start with.
 
 ### Research and coding
 

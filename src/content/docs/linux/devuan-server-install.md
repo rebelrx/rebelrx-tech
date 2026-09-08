@@ -3,7 +3,7 @@ title: "Devuan Server Installation Guide"
 description: >-
   Step-by-step Devuan Linux server installation with sysvinit, ext4, and a terminal/SSH-only setup — no systemd.
 ---
-**Target:** PC / Workstation (AMD Ryzen processor and NVIDIA GPU)
+**Target Machine:** PC / Workstation (AMD CPU and NVIDIA GPU)
 
 **Filesystem:** ext4
 
