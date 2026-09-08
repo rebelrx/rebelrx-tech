@@ -19,13 +19,15 @@ Installation is straightforward using the netinstall option.
 
 Before you begin:
 
-\- Ensure BIOS is set to UEFI (not legacy)
-\- Enable virtualization (SVM/VT-x)
-\- Disable secure boot (for NVIDIA drivers)
+- Ensure BIOS is set to UEFI (not legacy)
+- Enable virtualization (SVM/VT-x)
+- Check Devuan's current Secure Boot support before installation; NVIDIA module signing is a separate consideration
 
 * * *
 
-## 1\. Download Devuan and Create a Bootable ISO
+<a id="1-download-devuan-and-create-a-bootable-iso"></a>
+
+## 📥 1\. Download Devuan and Create a Bootable ISO
 
 Download Devuan Excalibur from [files.devuan.org/](https://files.devuan.org/)
 
@@ -35,13 +37,17 @@ Download Devuan Excalibur from [files.devuan.org/](https://files.devuan.org/)
 
 Create a bootable ISO with USB. PulsarTECH has a great Ventoy + Linux multi-boot USB guide available at: [youtube.com/watch?v=BfjLJ0CqWsY](https://www.youtube.com/watch?v=BfjLJ0CqWsY)
 
+Verify the ISO using the release's published checksums/signatures. Replace `devuan-netinstall.iso` with the exact filename. Identify the USB with `lsblk`; writing the ISO erases that device.
+
 On Linux:
 
 ```bash
-sudo dd if=devuan_excalibur_6.1.0_amd64_netinstall.iso of=/dev/sdX bs=4M status=progress conv=fsync
+sudo dd if=devuan-netinstall.iso of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
-## 2\. Boot the Live ISO
+<a id="2-boot-the-installer-iso"></a>
+
+## 📦 2\. Boot the Installer ISO
 
 Boot the PC from USB. Here's a reference list of Boot Menu keys for various manufacturers:
 
@@ -61,7 +67,9 @@ Boot the PC from USB. Here's a reference list of Boot Menu keys for various manu
 
 * * *
 
-## 3\. Install Devuan
+<a id="3-install-devuan"></a>
+
+## 📦 3\. Install Devuan
 
 Once at the Devuan GUI screen, choose the `Install` option:
 
@@ -145,7 +153,9 @@ If you prefer an enterprise-level and isolated partition style, you can opt for:
 
 * * *
 
-## 4\. Post-Install: First Boot Setup
+<a id="4-post-install-first-boot-setup"></a>
+
+## 📦 4\. Post-Install: First Boot Setup
 
 Log in as root at the terminal (using password set from prior steps).
 
@@ -233,7 +243,9 @@ free -h
 
 * * *
 
-## 5\. Install and Configure Tailscale
+<a id="5-install-and-configure-tailscale"></a>
+
+## 🌐 5\. Install and Configure Tailscale
 
 Tailscale provides secure, zero-config WireGuard-based mesh networking. All SSH access will go through the Tailscale network, meaning no SSH port is exposed to the public internet.
 
@@ -291,6 +303,8 @@ case "$1" in
     start)
         fail_unless_root
         log_daemon_msg "Starting Tailscale daemon" "tailscaled"
+        install -d -m 0700 /var/lib/tailscale
+        install -d -m 0755 /run/tailscale
         $TAILSCALED --cleanup
         start-stop-daemon --start --background --no-close \
             --exec $TAILSCALED \
@@ -366,7 +380,7 @@ tailscale set --ssh
 
 When using Tailscale SSH, connections are authenticated by your Tailscale ACLs instead of local SSH keys. You can configure who has access in the Tailscale admin console under **Access Controls**.
 
-**Note:** If you enabled Tailscale SSH above, you can optionally disable the local SSH daemon entirely since Tailscale handles SSH directly:
+**Note:** Only after a second Tailscale SSH session and console recovery have been tested, you can optionally disable OpenSSH. Keep OpenSSH if you need its forwarding features for the NPM admin tunnel; restrict it to the intended private access path:
 
 ```bash
 service ssh stop
@@ -398,6 +412,8 @@ ufw allow in on tailscale0
 ufw enable
 ```
 
+Docker-published ports may bypass UFW's ordinary host-service rules. Use narrow bind addresses and validate reachability from each network; see [Docker firewall guidance](https://docs.docker.com/engine/network/packet-filtering-firewalls/).
+
 If you later run services that need LAN access (e.g., NFS, a web server, Samba), add rules for those specific ports on the specific LAN interfaces:
 
 ```bash
@@ -407,7 +423,9 @@ ufw allow in on enp2s0 to any port 80 proto tcp
 
 * * *
 
-## 6\. Install NVIDIA GPU Drivers
+<a id="6-install-nvidia-gpu-drivers"></a>
+
+## 🖥️ 6\. Install NVIDIA GPU Drivers
 
 The open-source Nouveau driver must be disabled before installing the proprietary NVIDIA driver:
 
@@ -431,11 +449,12 @@ sudo apt install linux-headers-$(uname -r) build-essential libglvnd-dev pkg-conf
 Detect and install driver:
 
 ```bash
+sudo apt install nvidia-detect
 sudo nvidia-detect
 sudo apt install nvidia-driver nvidia-kernel-dkms nvidia-smi nvidia-settings
 ```
 
-Only use backports if the default driver fails for your GPU:
+The following is an ordinary repository install, not a backports command. Check GPU support and the enabled repository before selecting a newer driver:
 
 ```bash
 sudo apt install nvidia-driver firmware-misc-nonfree
@@ -475,18 +494,18 @@ Without an X server running, the NVIDIA driver may unload between GPU tasks, add
 nvidia-smi -pm 1
 ```
 
-To make this persistent across reboots, create an init script. For sysvinit:
+Prefer the persistence service supplied by your installed NVIDIA package, if available. Do not overwrite its init script. If you deliberately use the legacy persistence-mode command instead, this separately named sysvinit example enables it across reboots:
 
 ```bash
-cat > /etc/init.d/nvidia-persistenced << 'INITEOF'
+cat > /etc/init.d/nvidia-persistence-mode << 'INITEOF'
 #!/bin/sh
 ### BEGIN INIT INFO
-# Provides:          nvidia-persistenced
+# Provides:          nvidia-persistence-mode
 # Required-Start:    $local_fs
 # Required-Stop:     $local_fs
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: NVIDIA Persistence Daemon
+# Short-Description: Enable NVIDIA legacy persistence mode
 ### END INIT INFO
 
 case "$1" in
@@ -505,8 +524,8 @@ exit 0
 INITEOF
 
 
-chmod +x /etc/init.d/nvidia-persistenced
-update-rc.d nvidia-persistenced defaults
+chmod +x /etc/init.d/nvidia-persistence-mode
+update-rc.d nvidia-persistence-mode defaults
 ```
 
 - **Install CUDA Toolkit:**
@@ -525,7 +544,9 @@ nvcc --version
 
 * * *
 
-## 7\. Install Docker
+<a id="7-install-docker"></a>
+
+## 🐳 7\. Install Docker
 
 Docker CE's official Debian packages include a sysvinit init script (`/etc/init.d/docker`), so Docker runs natively on Devuan without systemd.
 
@@ -627,6 +648,8 @@ docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
 
 You should see the NVIDIA GPU listed with driver version and CUDA version.
 
+See [Docker Infrastructure Standards](/homelab/docker-infrastructure-standards/) for the canonical `/opt/docker/stacks` and `/opt/docker/data` layout.
+
 ### Docker Compose Quick Reference
 
 Docker Compose is installed as a CLI plugin. Use it with:
@@ -643,139 +666,37 @@ docker compose ps              # List running services
 
 * * *
 
-## 8\. NFS NAS Mounts
+<a id="8-nfs-nas-mounts"></a>
 
-If you are mounting external storage NAS drives (e.g., Synology, QNAP, TrueNAS), follow instructions below.
+## 🗂️ 8. NFS NAS Mounts
 
-- Install NFS Client Packages
+Use the [NAS Mounting guide](/homelab/nas-mounting/) as the canonical reference for export permissions, mount testing, boot behavior, and Docker dependencies.
 
-```bash
-apt install -y nfs-common
-```
-
-- Create Mount Points
-
-Create directories for each NFS share you want to mount. A clean convention is to mount them under `/mnt/nas/`:
+Install the client and create the mount point:
 
 ```bash
-mkdir -p /mnt/nas/media
-mkdir -p /mnt/nas/backups
-mkdir -p /mnt/nas/shared
+sudo apt install -y nfs-common
+sudo mkdir -p /mnt/nas/media
+sudo mount -t nfs -o hard,vers=4.1 NAS-IP:/media /mnt/nas/media
 ```
 
-Adjust the names to match your NAS export structure.
+Replace `NAS-IP` and the export path with values from your NAS configuration. Verify the correct remote filesystem and application permissions before adding an fstab entry:
 
-- Test Mounts Manually
-
-Before making them permanent, verify each mount works:
-
-```bash
-mount -t nfs4 nas.local:/volume1/media /mnt/nas/media
-ls /mnt/nas/media
+```text
+NAS-IP:/media /mnt/nas/media nfs rw,hard,vers=4.1,_netdev,nofail 0 0
 ```
 
-Replace `nas.local` with the IP or hostname of your NAS, and `/volume1/media` with the actual NFS export path. If using NFSv3:
+Use `ro` instead of `rw` for read-only media access. Use `hard` for backups and other data you care about. A soft timeout can cause data corruption; it is not the headless-server default.
 
-```bash
-mount -t nfs -o vers=3 nas.local:/volume1/media /mnt/nas/media
-```
+`_netdev` provides network ordering, not a guarantee of availability. `nofail` does not guarantee a fixed boot-time limit. Check boot behavior with the NAS unavailable and prevent dependent containers from starting against an empty local directory.
 
-- Configure Permanent Mounts in /etc/fstab
+Monitor missing mounts and alert for investigation. Do not schedule automatic forced/lazy unmounts or remounts while applications may still hold files open. Restore NAS/network service first, stop dependent writers, then recover the mount deliberately.
 
-Once the manual test succeeds, add entries to `/etc/fstab` for automatic mounting at boot:
+---
 
-```bash
-nano /etc/fstab
+<a id="9-fastfetch"></a>
 
-# NAS NFS Mounts
-nas.local:/volume1/media    /mnt/nas/media    nfs4  rw,soft,timeo=30,retrans=3,_netdev  0  0
-nas.local:/volume1/backups  /mnt/nas/backups  nfs4  rw,soft,timeo=30,retrans=3,_netdev  0  0
-nas.local:/volume1/shared   /mnt/nas/shared   nfs4  rw,soft,timeo=30,retrans=3,_netdev  0  0
-```
-
-**Mount options explained:**
-
-- **`rw`**: Read-write access. Use `ro` for read-only shares like media libraries.
-- **`soft`**: Returns an error if the NAS is unreachable instead of hanging indefinitely. Critical for a headless server — a `hard` mount will cause processes to freeze and become unkillable if the NAS goes offline.
-- **`timeo=30`**: Timeout in deciseconds (3 seconds) before retrying.
-- **`retrans=3`**: Number of retries before reporting failure.
-- **`_netdev`**: Tells the init system this mount requires the network to be up first, preventing boot hangs if the NAS is unreachable.
-
-> ⚠️ **`soft` vs `hard` is a deliberate tradeoff.** This guide uses `soft` to keep a headless server responsive when the NAS drops. The [NAS Mounting guide](/homelab/nas-mounting/) recommends `hard` for shares that receive writes (backups especially), because `soft` can silently truncate interrupted writes. Pick per share: `soft` for read-mostly media, `hard` for write-critical data.
-
-Mount all new fstab entries:
-
-```bash
-mount -a
-```
-
-Verify:
-
-```bash
-df -h | grep nas
-```
-
-- NFS Mount Permissions
-
-NFS permissions depend on how your NAS exports are configured. Common approaches:
-
-**UID/GID mapping (recommended):** Ensure the UID and GID of your Devuan user match the NFS export's expected UID/GID. Check with `id yourusername` on Devuan and compare against the NAS settings.
-
-**all_squash with anonuid/anongid:** If the NAS export uses `all_squash`, all access is mapped to a single UID/GID defined on the NAS side. This is the simplest for shared access.
-
-**No root squash:** Only enable `no_root_squash` on the NAS if you specifically need root write access from this server. This is a security risk and is generally unnecessary.
-
-- Using NFS Mounts in Docker Containers
-
-Bind-mount the host NFS path
-
-In your `compose.yaml`:
-
-```yaml
-services:
-  myapp:
-    image: myapp:latest
-    volumes:
-      - /mnt/nas/media:/data/media
-      - /mnt/nas/shared:/data/shared
-```
-
-This is the simplest approach. The host handles the NFS connection and containers see the data as a regular directory.
-
-- Monitoring NFS Mount Health
-
-NFS mounts can silently become stale if the NAS reboots or the network hiccups. Create a simple health check cron job:
-
-```bash
-cat > /etc/cron.d/nfs-health << 'EOF'
-*/5 * * * * root /usr/local/bin/nfs-health-check.sh
-EOF
-
-
-cat > /usr/local/bin/nfs-health-check.sh << 'SCRIPT'
-#!/bin/sh
-for mount in /mnt/nas/media /mnt/nas/backups /mnt/nas/shared; do
-    if mountpoint -q "$mount"; then
-        timeout 5 ls "$mount" > /dev/null 2>&1
-        if [ $? -ne 0 ]; then
-            logger -t nfs-health "STALE mount detected: $mount — attempting remount"
-            umount -l "$mount" 2>/dev/null
-            mount "$mount"
-        fi
-    else
-        logger -t nfs-health "Mount missing: $mount — attempting mount"
-        mount "$mount"
-    fi
-done
-SCRIPT
-
-
-chmod +x /usr/local/bin/nfs-health-check.sh
-```
-
-This checks every 5 minutes that each NFS mount is responsive, and attempts a remount if a share has gone stale. Check the results in `/var/log/syslog` with `grep nfs-health /var/log/syslog`.
-
-## 9\. Fastfetch
+## 🧭 9\. Fastfetch
 
 "Obligatory neofetch" (fastfetch):
 
@@ -786,7 +707,9 @@ sudo apt install fastfetch
 
 * * *
 
-## Result
+<a id="result"></a>
+
+## ✅ Result
 
 - No systemd
 - Full Docker support

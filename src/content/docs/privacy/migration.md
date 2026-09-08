@@ -70,7 +70,7 @@ Move one category at a time.
 
 ### 🔐 Passwords
 
-- Export from Chrome
+- Export from Chrome only when ready to import; password CSV exports are generally plaintext. Keep the file out of shared/cloud folders, verify the import, then remove the temporary export and any unintended copies
 - Import into:
   - Bitwarden **or**
   - Proton Pass
@@ -112,7 +112,7 @@ Start with:
 ### 📸 Photos
 
 - Export from Google Photos
-- Upload into Immich
+- Review Immich's import guidance, preserve original files and metadata, and verify representative dates/albums after importing into Immich
 
 > ⚠️ This can take time—do it in batches
 
@@ -121,7 +121,7 @@ Start with:
 ### 📝 Notes
 
 - Export Google Keep / Apple Notes
-- Import into Joplin
+- Check the source export format and Joplin's supported import formats; convert where needed, then verify attachments, formatting, and note counts
 
 ---
 

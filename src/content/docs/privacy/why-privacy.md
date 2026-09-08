@@ -10,11 +10,11 @@ It’s about **control, autonomy, and long-term risk reduction**.
 
 ## 🧠 The Modern Reality
 
-Most mainstream services:
+Many advertising-funded services may:
 
 - Track behavior
 - Build detailed user profiles
-- Use your data to train AI systems without you getting a penny
+- Use some content for AI training, depending on the product, account type, policy, and available controls
 - Monetize your own data
 
 Examples:

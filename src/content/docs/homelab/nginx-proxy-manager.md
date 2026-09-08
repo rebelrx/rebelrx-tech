@@ -3,7 +3,7 @@ title: "🔀 Nginx Proxy Manager (Private HTTPS for Everything)"
 description: >-
   Nginx Proxy Manager for a private homelab — clean HTTPS names for every service, wildcard certificates with zero exposed ports via DNS-01, and local DNS with AdGuard Home.
 ---
-Ports and IP addresses don't scale. `http://192.168.1.20:8096` works for one service; by service ten it's a memory game, every browser screams "Not Secure," and nothing has TLS.
+Ports and IP addresses don't scale. `http://192.0.2.20:8096` works for one service; by service ten it's a memory game, every browser screams "Not Secure," and nothing has TLS.
 
 A reverse proxy fixes all of it: **one entry point, real HTTPS, clean names** — `https://jellyfin.home.example.com` — without exposing a single port to the internet.
 
@@ -36,27 +36,29 @@ Three components:
 2. **Local DNS** that answers for it inside your network — AdGuard Home in this guide
 3. **NPM** terminating TLS and routing by hostname
 
-> The domain being real is what makes real certificates possible; no self-signed warnings, no CA imports on every device.
+> The domain being real is what makes real certificates possible; no self-signed warnings, no CA imports on every device. Private certificate authorities are another valid option, but require distributing trust to clients.
 
 ---
 
 ## 📦 The NPM Stack
 
-Following the [homelab structure](/homelab/docker-home-lab/), `/opt/stacks/npm/compose.yaml`:
+Following the [homelab structure](/homelab/docker-home-lab/), `/opt/docker/stacks/npm/compose.yaml`:
 
 ```yaml
+name: npm
+
 services:
   npm:
-    image: jc21/nginx-proxy-manager:latest
+    image: jc21/nginx-proxy-manager:${NPM_TAG:?Set a reviewed NPM release tag}
     container_name: nginx-proxy-manager
     restart: unless-stopped
     ports:
-      - "80:80"            # HTTP (redirects to HTTPS)
-      - "443:443"          # HTTPS
+      - "${PROXY_BIND_IP:?Set a reachable private host address}:80:80"
+      - "${PROXY_BIND_IP:?Set a reachable private host address}:443:443"
       - "127.0.0.1:81:81"  # admin UI — localhost only, reached via Tailscale/SSH
     volumes:
-      - /opt/data/npm/data:/data
-      - /opt/data/npm/letsencrypt:/etc/letsencrypt
+      - /opt/docker/data/npm/data:/data
+      - /opt/docker/data/npm/letsencrypt:/etc/letsencrypt
     networks:
       - proxy
 
@@ -65,30 +67,46 @@ networks:
     external: true
 ```
 
+Create the stack directory and save the Compose file there. Create a local `.env` using this template, replacing the blank values before starting:
+
+```dotenv
+# =============================================================================
+# Nginx Proxy Manager - Environment Configuration
+# =============================================================================
+# A reviewed release from the upstream release notes:
+NPM_TAG=
+# Actual LAN or Tailscale address assigned to this host (never 0.0.0.0):
+PROXY_BIND_IP=
+```
+
+Protect it with `chmod 600 .env` and keep it out of Git. The examples use reserved documentation addresses; replace them with your own values locally.
+
 Create the shared network once, then bring it up:
 
 ```bash
 docker network create proxy
-cd /opt/stacks/npm
+cd /opt/docker/stacks/npm
+docker compose config --quiet
 docker compose up -d
 ```
 
 :::caution[Bind the admin UI to localhost]
 The `127.0.0.1:81:81` binding means the admin panel is unreachable from
-the network — even your LAN. Reach it through Tailscale or an SSH tunnel.
+the network — even your LAN or tailnet. Reach it through an SSH tunnel over your authorized private connection.
 The panel that controls all your routing should be the hardest thing to
 reach, not the easiest.
 :::
 ### First Login
 
-Browse to `http://server:81` (over Tailscale) and log in with NPM's defaults:
+On your client, forward a local port to the server's loopback address:
 
-```text
-Email:    admin@example.com
-Password: changeme
+```bash
+ssh -N -L 8181:127.0.0.1:81 user@server.example
 ```
 
-It forces a credential change immediately. Use the password manager.
+Replace `server.example` with the server's private name. Open `http://127.0.0.1:8181` on that client while the tunnel remains open. This requires an SSH server and access policy that permit local TCP forwarding; use OpenSSH over Tailscale if your Tailscale SSH setup does not support the required forwarding.
+
+Complete the first-run account setup for your chosen release. Older releases used a default account; do not assume those credentials apply to a new installation. See the [upstream setup instructions](https://nginxproxymanager.com/setup/) and the release notes for the exact version. Use a strong unique password.
 
 ---
 
@@ -119,7 +137,7 @@ Now NPM can reach `jellyfin:8096` directly, and you can **remove the service's p
 
 ## 🔐 Wildcard Certificate with Zero Exposed Ports (DNS-01)
 
-The usual Let's Encrypt flow (HTTP-01) requires port 80 open to the internet — exactly what this setup refuses to do. The **DNS-01 challenge** proves domain ownership through a DNS record instead, so it works with every port closed. Bonus: it's the only challenge type that can issue **wildcard** certs.
+The usual Let's Encrypt flow (HTTP-01) requires port 80 open to the internet — exactly what this setup refuses to do. The **DNS-01 challenge** proves domain ownership through a DNS record instead, so issuance needs no inbound public port. DNS, ACME, and provider API access still require outbound connectivity. Bonus: it's the only challenge type that can issue **wildcard** certs.
 
 ### 1. Create a DNS API Token
 
@@ -137,15 +155,10 @@ At your DNS provider (Cloudflare shown; NPM supports dozens):
 - ✅ *Use a DNS Challenge* → provider: Cloudflare → paste the token
 - Agree, save. Issuance takes a minute or two.
 
-One wildcard cert now covers every service you'll ever add under `*.home.example.com` — no per-service issuance, and renewals are automatic.
+The wildcard covers one label, such as `jellyfin.home.example.com`, but not `a.b.home.example.com`. The separate `home.example.com` name covers the base. Monitor renewals and keep DNS API credentials valid.
 
 :::tip[Keep private names out of public DNS]
-With the wildcard, individual hostnames (`jellyfin.`, `paperless.`,
-`vault.`) never appear anywhere public — not in your DNS zone, and not in
-certificate transparency logs, which log every issued cert and are
-searchable by anyone. A per-service cert for `vault.home.example.com`
-announces to the world that you run a password vault. The wildcard
-announces nothing.
+A wildcard avoids listing every service name in the certificate. The wildcard and base domain still appear in public certificate transparency logs, and DNS-01 publishes a temporary validation record. Keep service records in local DNS, but do not treat wildcard certificates as anonymity or access control. See [Let's Encrypt challenge types](https://letsencrypt.org/docs/challenge-types/).
 :::
 ---
 
@@ -157,18 +170,13 @@ The internet has no idea what `jellyfin.home.example.com` is — only your netwo
 
 ```text
 Domain: *.home.example.com
-Answer: 192.168.1.10        # your server's LAN IP
+Answer: 192.0.2.10        # your server's LAN IP
 ```
 
 One wildcard rewrite covers every current and future service.
 
 :::tip[Make it work over Tailscale too]
-Point the rewrite at the server's **Tailscale IP** (`100.x.y.z`) instead of
-the LAN IP, and set AdGuard Home as your tailnet's DNS server (Tailscale
-admin console → DNS → add your AdGuard instance, enable *Override local
-DNS*). Now `https://jellyfin.home.example.com` works identically at home
-and across the [tailnet](/homelab/tailscale/) — one URL everywhere, ad-blocking
-included.
+A Tailscale address works only for clients with a permitted tailnet path. Ordinary LAN devices do not gain that route just because DNS returns the address. For mixed clients, use LAN DNS answers plus an approved subnet route for remote clients, or deliberate split DNS. Ensure the DNS resolver and NPM's bound address are reachable from each client class. See [DNS & Network Privacy](/homelab/dns-and-network-privacy/) and [Tailscale](/homelab/tailscale/).
 :::
 ---
 
@@ -209,19 +217,18 @@ Repeat per service; each one is thirty seconds:
 :::tip[Websockets: just leave it on]
 Half the homelab (Jellyfin, Uptime Kuma, Dozzle, Home Assistant, anything
 with a live-updating UI) needs websockets, and the symptom when it's off
-is maddeningly vague — pages load but nothing updates. Enable it by
-default and never debug it again.
+is maddeningly vague — pages load but nothing updates. Enable it for applications that require it and test the connection.
 :::
 ---
 
 ## 🛡️ Hardening Checklist
 
-- Admin UI bound to `127.0.0.1`, reached via [Tailscale](/homelab/tailscale/) only
+- Admin UI bound to `127.0.0.1`, reached through the SSH tunnel over [Tailscale](/homelab/tailscale/)
 - **Force SSL** on every proxy host; add **HSTS** once you're confident in the cert renewal
 - **Block Common Exploits** enabled per host
 - Default site (Settings → Default Site) set to a 404 — unknown hostnames hitting the proxy learn nothing
 - Remove published ports from services once their proxy host works
-- NPM's data lives in `/opt/data/npm` — already covered by the [backup strategy](/homelab/backup-and-recovery/); losing it means re-creating every host by hand
+- NPM's data lives in `/opt/docker/data/npm` — include both data and certificates explicitly in the [backup strategy](/homelab/backup-and-recovery/); losing it means re-creating every host by hand
 
 ---
 
@@ -231,7 +238,7 @@ default and never debug it again.
 - **DNS challenge fails** → API token scope wrong, or propagation lag — retry once, then re-check the token permissions. NPM's logs (`docker logs nginx-proxy-manager`) show certbot's actual error.
 - **Name doesn't resolve** → the client isn't using AdGuard for DNS. Check which resolver the device actually uses (`nslookup jellyfin.home.example.com`); phones on cellular need the Tailscale DNS setup above.
 - **Redirect loop** → the backend app also forces HTTPS. Set the app's base URL to the proxied `https://` address, or forward with scheme `https` if the app serves TLS itself.
-- **Works on LAN, dead over Tailscale** → the DNS rewrite points at the LAN IP. Use the Tailscale IP (reachable from both contexts) as the rewrite answer.
+- **Works on LAN, dead over Tailscale** → the DNS rewrite points at the LAN IP. Check approved subnet routes, access policy, DNS answers, and the address NPM actually binds to.
 
 ---
 
@@ -248,4 +255,4 @@ default and never debug it again.
 
 The reverse proxy is where a pile of containers starts feeling like **infrastructure**: named, encrypted, consistent, reachable the same way from your couch or another continent.
 
-> One door. Every service behind it. Nothing exposed.
+> One entry point. Private access. Deliberate routing.

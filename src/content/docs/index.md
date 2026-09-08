@@ -69,7 +69,9 @@ hero:
 
 <p class="rx-eyebrow">Start here</p>
 
-## Popular starting points
+<a id="popular-starting-points"></a>
+
+## 🧭 Popular starting points
 
 - **[Why Linux?](/linux/why-linux/)** — Understand the case for leaving proprietary operating-system defaults behind.
 - **[Privacy migration guide](/privacy/migration/)** — Replace services gradually instead of trying to overhaul everything at once.

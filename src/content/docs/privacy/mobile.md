@@ -35,7 +35,7 @@ No new phone, no flashing. Thirty minutes:
 - **Use the browser instead of the app** where possible (social media especially) — websites get far less access than installed apps.
 - **Turn off Wi-Fi and Bluetooth scanning** → Android buries these under Location settings; they beacon your presence even when Wi-Fi is "off."
 - **Set a strong passcode** → 6+ digits minimum; biometrics are convenience, the passcode is the real lock.
-- **iPhone extra** → Enable **Advanced Data Protection** (Settings → iCloud) for end-to-end encrypted backups.
+- **iPhone extra** → Review **Advanced Data Protection** availability in your region and its recovery requirements; enable it when available and appropriate.
 
 > Level 1 doesn't defeat platform telemetry. It shrinks what the app layer collects and that's most of the daily bleeding.
 
@@ -62,7 +62,7 @@ Same phone, better software. The mobile versions of the [App Recommendations](/p
 
 Two-factor is non-negotiable but the *app* matters:
 
-- **Google Authenticator** syncs your 2FA seeds to your Google account (unencrypted end-to-end for years) — the keys to everything, held by the company you're leaving
+- **Google Authenticator** offers optional Google-account synchronization and can also be used without an account. Review its [current sync and transfer behavior](https://support.google.com/accounts/answer/1066447) before deciding how to protect your seeds
 - **Authy** is closed-source and was breached in 2024 (phone numbers of 33M users exposed)
 - **Aegis** and **Ente Auth** are open-source with encrypted, locally-controlled backups
 
@@ -82,25 +82,24 @@ restore once.
 
 ## 🪜 Level 3 — Replace the OS (GrapheneOS)
 
-App swaps can't fix an operating system that reports home. When you're ready to remove Google from the platform itself, [**GrapheneOS**](https://grapheneos.org/) is the strongest option available; a hardened, security-first Android with no Google services and no compromises bolted on.
+App swaps can't fix an operating system that reports home. When you're ready to remove Google from the platform itself, [**GrapheneOS**](https://grapheneos.org/) is the strongest option available; a hardened, security-first Android without Google services by default. Compatibility and hardware support still involve tradeoffs.
 
 ### The Pixel Irony
 
 Yes: the best way to escape Google's software is Google's hardware.
 
-GrapheneOS supports **only Pixel devices** (currently Pixel 6 through the Pixel 10 series) because Pixels are the only mainstream phones that let you **re-lock the bootloader with your own signing keys** meaning verified boot protects *your* OS, not the vendor's. No other consumer hardware offers that.
+Check the [current supported-device list](https://grapheneos.org/faq#supported-devices) before buying or flashing. Support depends on hardware security, verified boot, firmware updates, and available maintenance—not bootloader relocking alone.
 
 :::tip[Practical buying advice]
 - Buy **factory unlocked**, directly from Google or a reputable retailer —
   carrier-locked models (especially US Verizon/AT&T variants) often cannot
   be bootloader-unlocked at all
-- A used Pixel 8/8a is the budget sweet spot: well under $350 with security
-  support for years
+- Compare the purchase price with the remaining full security-support lifetime
 - Newer models simply extend the support window
 :::
 ### Installing
 
-The [official web installer](https://grapheneos.org/install/web) runs from a browser. Connect the phone, follow the steps, re-lock the bootloader at the end. 15–20 minutes, no tooling to install.
+The [official web installer](https://grapheneos.org/install/web) runs from a browser. Connect the phone, follow the steps, re-lock the bootloader at the end. Back up first: bootloader unlocking erases user data. Follow the supported browser, cable, and device requirements; allow time for recovery if a step fails.
 
 ### Living With It
 
@@ -109,15 +108,11 @@ The [official web installer](https://grapheneos.org/install/web) runs from a bro
 - **Day-to-day** → It's still Android. Your Level 2 apps all work.
 
 :::caution[Check your banking apps first]
-Some banking apps demand Google's hardware attestation and refuse to run
-on any custom OS — roughly half work on GrapheneOS with sandboxed Play,
-and it varies by bank and by year. Check community compatibility lists for
-your specific apps **before** flashing. The fallback that always works:
-your bank's website in Brave.
+App compatibility varies with attestation requirements and can change. Test the exact banking, wallet, work, and accessibility apps you need before switching. A bank's website may provide an alternative, but it is not a guaranteed replacement for every app feature.
 :::
 ### Alternative: CalyxOS
 
-[CalyxOS](https://calyxos.org/) trades some of GrapheneOS's hardening for convenience: **microG** (an open-source Play Services reimplementation) ships pre-installed, and it supports Fairphone and some Motorola devices in addition to Pixels. A reasonable middle path — but if you have a supported Pixel, GrapheneOS is the stronger choice.
+[CalyxOS](https://calyxos.org/) trades some of GrapheneOS's hardening for convenience: **microG** (an open-source Play Services reimplementation) ships pre-installed, and it supports Fairphone and some Motorola devices in addition to Pixels. Check its [current release and maintenance status](https://calyxos.org/news/) and device list first. The project resumed maintained releases in July 2026 after a pause; an old installation may require a documented migration.
 
 ---
 

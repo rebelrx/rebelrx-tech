@@ -19,9 +19,9 @@ Port forwarding exposes services to the entire internet and hopes your login pag
 
 ## 🧭 What Tailscale Is
 
-Tailscale builds a private mesh network (a "tailnet") between your devices using **WireGuard**, the modern, audited VPN protocol built into the Linux kernel.
+Tailscale builds a private mesh network (a "tailnet") between your devices using **WireGuard**, the modern, audited VPN protocol used for the encrypted data plane. Tailscale commonly implements WireGuard in userspace.
 
-- Every device gets a stable private IP (`100.x.y.z`)
+- Every enrolled device gets a tailnet IP (`100.x.y.z`)
 - Devices connect **directly to each other** (peer-to-peer) whenever possible
 - Traffic is end-to-end encrypted between your devices
 - Works through NAT and firewalls with zero router configuration
@@ -48,8 +48,7 @@ replacement for Tailscale's coordination server. The official Tailscale clients
 connect to it directly.
 
 Recommended path: start with hosted Tailscale to learn the model, migrate to
-Headscale once your tailnet is stable. The client-side commands in this guide
-are identical either way.
+Headscale once your tailnet is stable. Headscale requires its own control-server URL and policy setup; follow its client registration instructions rather than assuming hosted Tailscale commands are identical.
 :::
 ---
 
@@ -59,7 +58,7 @@ are identical either way.
 - A free Tailscale account → <https://login.tailscale.com/start>
   - Sign-in is via an identity provider. To keep Big Tech out of the loop, use **Passkey** sign-up or a GitHub account rather than a Google/Microsoft login.
 
-The free plan provides access to nearly all of Tailscale's offerings, covers unlimited user devices and 6 users — more than enough for a homelab.
+Check the current [Tailscale plans](https://tailscale.com/pricing) for user, device, and feature limits; plan allowances can change.
 
 ---
 
@@ -93,14 +92,13 @@ sudo apt install -y tailscale
 
 :::note[Expect a harmless error]
 The package's post-install step tries to talk to systemd and will complain.
-Ignore it — the binaries (`/usr/sbin/tailscaled` and `/usr/bin/tailscale`)
-install correctly. We supply the init script ourselves in the next step.
+Inspect the error and `dpkg --audit`; do not ignore a failed package configuration. Confirm the binaries are installed and check whether your package already supplies an init script before adding the example below.
 :::
 ---
 
 ### 2. Create the sysvinit Script
 
-Tailscale provides no init script for sysvinit. Create one:
+If the installed package has no sysvinit script, create one. Do not overwrite a packaged or locally maintained service script:
 
 ```bash
 sudo nano /etc/init.d/tailscaled
@@ -225,7 +223,7 @@ Install the Tailscale app on your phone or tablet and sign in to the same accoun
 - Android → F-Droid or Play Store
 - iOS → App Store
 
-Every device that joins can now reach every other device on its `100.x.y.z` address.
+Devices can reach one another only as allowed by the tailnet policy and host firewall. Review the initial policy before adding shared users or lower-trust devices.
 
 ---
 
@@ -274,16 +272,16 @@ sudo sysctl -p
 ### 2. Advertise Your LAN Subnet
 
 ```bash
-sudo tailscale up --advertise-routes=192.168.1.0/24
+sudo tailscale set --advertise-routes=192.0.2.0/24
 ```
 
-(Replace with your actual LAN subnet.)
+(Replace the reserved documentation subnet with your actual LAN subnet. Do not publish that value in your public guide.)
 
 ### 3. Approve the Route
 
 Admin console → **Machines** → your server → **Edit route settings** → approve the subnet.
 
-Now your phone on cellular can reach `192.168.1.x` devices as if you were home — NAS web UI, printer, everything.
+Now your phone on cellular can reach devices on the approved subnet devices as if you were home — NAS web UI, printer, everything.
 
 > One subnet router replaces installing Tailscale on every device you own.
 
@@ -296,14 +294,13 @@ An exit node routes **all** of a device's internet traffic through your home con
 On the server:
 
 ```bash
-sudo tailscale up --advertise-routes=192.168.1.0/24 --advertise-exit-node
+sudo tailscale set --advertise-exit-node
 ```
 
 Approve it in the admin console (same place as routes). Then on your laptop or phone, select the server as your exit node when on untrusted networks.
 
 :::tip
-`tailscale up` flags are not additive — each run replaces the previous
-configuration. Always pass the full set of flags you want active.
+Use `tailscale set` to change selected preferences on an already connected node. `tailscale up` may require previously configured non-default flags and reports what is missing. See the [CLI reference](https://tailscale.com/docs/reference/tailscale-cli).
 :::
 ---
 
@@ -314,17 +311,17 @@ With Tailscale up, your [Docker services](/homelab/docker-home-lab/) are reachab
 ```text
 http://homemachine:8096    → Jellyfin
 http://homemachine:2283    → Immich
-http://homemachine:81      → Nginx Proxy Manager admin
+http://127.0.0.1:8181      → NPM admin through the SSH tunnel on your client
 ```
 
 The clean pattern:
 
 - Docker services bind to the host (or to the Tailscale IP only)
 - Nginx Proxy Manager routes internal hostnames
-- Tailscale is the **only** path in
+- Tailscale is the intended remote path; LAN-bound ports may also be reachable locally
 - Router port forwarding: **none**
 
-> If a port isn't forwarded, the entire internet's scanners can't even see it.
+> Verify reachability explicitly. IPv6, UPnP/NAT-PMP, tunnels, and Docker bindings can create access paths without a manual IPv4 port-forward.
 
 ---
 
@@ -380,7 +377,7 @@ tailscale ping machinename   # verify connectivity + path to a node
 Common issues:
 
 - **`failed to connect to local tailscaled`** → the daemon isn't running. `sudo /etc/init.d/tailscaled start` (Devuan) or `sudo rc-service tailscaled start` (Artix).
-- **Connections show `relay` instead of `direct`** → traffic is bouncing through Tailscale's DERP relays. Still encrypted, just slower. Allowing UDP 41641 outbound usually restores direct paths.
+- **Connections show `relay` instead of `direct`** → traffic is bouncing through Tailscale's DERP relays. Still encrypted, just slower. Direct connectivity depends on both peers' NAT/firewall behavior; inspect `tailscale netcheck` and upstream firewall guidance before changing rules.
 - **Subnet routes not working** → route not approved in the admin console, or IP forwarding not enabled. Check both.
 - **Node vanished from the tailnet** → key expiry. Re-authenticate with `sudo tailscale up`, then disable expiry so it doesn't recur.
 

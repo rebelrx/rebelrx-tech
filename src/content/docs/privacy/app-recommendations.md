@@ -5,6 +5,8 @@ description: >-
 ---
 High-impact replacements for common Big Tech services.
 
+These are alternatives to evaluate, not identical replacements. Hosting software yourself does not automatically encrypt data end-to-end or eliminate external requests. Email encryption depends on the recipient and delivery method; sync needs separate backups. Review current support and export options before migrating.
+
 ---
 
 ## 🌐 Browser & Search
@@ -14,7 +16,7 @@ High-impact replacements for common Big Tech services.
 | Chrome | [Brave](https://brave.com/) | Built-in ad/tracker blocking, Chromium-based |
 | Google Search | [DuckDuckGo](https://duckduckgo.com/) / [Startpage](https://www.startpage.com/) | Reduced tracking |
 
-> 💡 Advanced: Self-host [SearxNG](https://docs.searxng.org/) for a fully private search engine
+> 💡 Advanced: Self-host [SearXNG](https://docs.searxng.org/) to control your search frontend; upstream engines still receive queries from the instance
 
 ---
 
@@ -44,7 +46,7 @@ High-impact replacements for common Big Tech services.
 |--------|------|-----|
 | Google Keep | [Joplin](https://joplinapp.org/) | Markdown-based, open |
 | Apple Notes | [Joplin](https://joplinapp.org/) / [Standard Notes](https://standardnotes.com/) | Cross-platform |
-| VS Code | [VSCodium](https://vscodium.com/) | Open-source, telemetry-free |
+| VS Code | [VSCodium](https://vscodium.com/) | Microsoft telemetry disabled; extensions and services need separate review |
 
 ---
 
@@ -103,7 +105,7 @@ High-impact replacements for common Big Tech services.
 |--------|------|-----|
 | Google Authenticator / Authy | [Aegis](https://getaegis.app/) (Android) / [Ente Auth](https://ente.io/auth/) (cross-platform) | Open-source, encrypted exportable backups, no cloud lock-in |
 
-> 💡 Google Authenticator syncs your 2FA seeds to your Google account; Authy is closed-source and suffered a 2024 breach. Your second factor deserves better. See the [Mobile Privacy guide](/privacy/mobile/) for details.
+> 💡 Google Authenticator offers optional account sync; Authy is closed-source and suffered a 2024 breach. Your second factor deserves better. See the [Mobile Privacy guide](/privacy/mobile/) for details.
 
 ---
 
@@ -119,7 +121,7 @@ High-impact replacements for common Big Tech services.
 
 | Replace | With | Why |
 |--------|------|-----|
-| No VPN / Free VPNs | [Mullvad](https://mullvad.net/) | Privacy-first, no account required |
+| No VPN / Free VPNs | [Mullvad](https://mullvad.net/) | Numbered account; no email address required |
 | Traditional VPN | [Tailscale](https://tailscale.com/) / [Headscale](https://github.com/juanfont/headscale) | Private mesh VPN, secure remote access |
 
 ---
@@ -165,7 +167,7 @@ High-impact replacements for common Big Tech services.
 
 | Replace | With | Why |
 |--------|------|-----|
-| Speedtest.net | [LibreSpeed](https://librespeed.org/) / [Speedtest Tracker](https://github.com/alexjustesen/speedtest-tracker) | Self-hosted speed testing, no tracking |
+| Speedtest.net | [LibreSpeed](https://librespeed.org/) / [Speedtest Tracker](https://github.com/alexjustesen/speedtest-tracker) | Self-hosted results; test endpoints and backends determine external data flows |
 
 ---
 
@@ -198,7 +200,7 @@ High-impact replacements for common Big Tech services.
 - Nextcloud AIO
 - Immich
 - Vaultwarden
-- SearxNG
+- SearXNG
 - Jellyfin
 - Arr stack
 - Paperless-ngx

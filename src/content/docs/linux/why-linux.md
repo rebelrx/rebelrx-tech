@@ -168,7 +168,7 @@ However, Windows and macOS treat the CLI as optional and only for commanding adv
 
 Windows and macOS instead favor the graphical user interface (GUI) for everyday users (just **point and click**)
 
-> The CLI is foundational for Linux and really not optional.
+> The CLI is foundational for the administration and self-hosting workflows in these guides. Everyday desktop use can often stay in the graphical interface, especially on Fedora KDE.
 
 :::tip[CLI Learning Curve (What to Expect)]
 If you're coming from Windows or macOS, the CLI will feel uncomfortable at first.
@@ -496,7 +496,7 @@ Depending on distro, expect:
 6. Reboot into your system
 
 :::caution[Disk Partitioning Risk]
-Linux installs often require manual disk partitioning.
+Manual partitioning is part of the Artix walkthrough here, but distributions such as Fedora and Debian also offer guided installation options. The same care with disk selection still applies.
 
 This is one of the few steps where you can accidentally:
 
@@ -578,3 +578,9 @@ If this aligns with your goals:
 
 * [Artix Desktop Manual Install](/linux/artix-kde-openrc-install/)
 * [Devuan Server Install](/linux/devuan-server-install/)
+
+## 🔗 Choose Your Installation Guide
+
+- [Fedora KDE desktop](/linux/fedora-kde-install/) for a guided desktop path
+- [Artix KDE + OpenRC](/linux/artix-kde-openrc-install/) for the manual, non-systemd desktop path
+- [Debian server](/linux/debian-server-install/) or [Devuan server](/linux/devuan-server-install/) for your preferred server init system

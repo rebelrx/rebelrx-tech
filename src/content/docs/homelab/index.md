@@ -1,16 +1,16 @@
 ---
 title: "🏠 Homelab"
 description: >-
-  Build a sovereign, privacy-first homelab: Docker services, private networking with Tailscale, reverse proxy, NAS storage, and tested backups.
+  Build a sovereign, privacy-first homelab: Docker standards, private networking, DNS filtering, local AI, monitoring, Git-managed infrastructure, storage, and tested disaster recovery.
 ---
 Guides for building a sovereign, privacy-first homelab you fully control.
 
 This section focuses on:
 
-- Self-hosting critical services  
-- Eliminating unnecessary cloud dependency  
-- Designing systems that are stable, observable, and maintainable  
-- Taking back ownership of your data and infrastructure  
+- Self-hosting critical services
+- Eliminating unnecessary cloud dependency
+- Designing systems that are stable, observable, and maintainable
+- Taking back ownership of your data and infrastructure
 
 ---
 
@@ -20,102 +20,120 @@ This section focuses on:
 
 ---
 
-## 🧭 What You'll Find Here
+## 🧭 Start Here
 
-- **Service Deployment** → What to self-host and how to run it reliably  
-- **Networking** → Secure access without exposing your entire system  
-- **Storage & Backup** → Data durability and recovery strategies  
-- **Standards** → Patterns that prevent your lab from becoming chaos  
+### [Docker Homelab](/homelab/docker-home-lab/)
 
----
+Install and operate a Compose-first homelab on bare-metal Linux.
 
-## 🔧 Core Areas
+### [Docker Infrastructure Standards](/homelab/docker-infrastructure-standards/)
 
-### 🧩 Services
+The conventions that keep multiple hosts and dozens of stacks maintainable: directory layout, `.env.example`, Compose validation, documentation, updates, and backups.
 
-Applications worth self-hosting and how to deploy them correctly.
+### [Git-Managed Homelab](/homelab/git-managed-homelab/)
 
-Focus:
-
-- Media (Plex, Jellyfin)  
-- File storage (Nextcloud)  
-- Monitoring (Grafana, Prometheus, Uptime Kuma)  
-- Automation and tooling  
-
-> Not everything should be self-hosted — only what you can realistically maintain.
+Use Git/Forgejo as the configuration history and source of truth for infrastructure changes.
 
 ---
 
-### 🌐 Networking
+## 🌐 Network & Access
 
-How everything connects — securely and predictably.
+### [Tailscale](/homelab/tailscale/)
 
-Includes:
+Private remote access without exposing administrative services directly to the Internet.
 
-- Reverse proxies (Nginx Proxy Manager)  
-- Private access (Tailscale, VPNs)  
-- DNS design  
-- Service exposure strategy  
+### [DNS & Network Privacy](/homelab/dns-and-network-privacy/)
 
-:::caution
-Opening ports blindly is how homelabs get compromised.
+AdGuard Home/Pi-hole concepts, upstream DNS, browser DoH, IoT segmentation, and the real limits of DNS blocking.
 
-This section prioritizes **controlled access**, not convenience.
-:::
----
+### [Nginx Proxy Manager](/homelab/nginx-proxy-manager/)
 
-### 💾 Storage
-
-Your data layer; where most homelabs fail.
-
-Focus:
-
-- NAS integration  
-- Mount strategies (NFS, SMB)  
-- Backup architecture  
-- Media and archive organization  
-
-> If your backup strategy isn’t tested, it doesn’t exist.
+Reverse-proxy patterns for services that need clean internal or controlled external access.
 
 ---
 
-### 📏 Standards
+## 💾 Storage & Recovery
 
-The difference between a clean lab and an unmaintainable mess.
+### [Mounting NAS Storage](/homelab/nas-mounting/)
 
-Includes:
+NFS/SMB design, reliable mounts, Docker ordering, and avoiding databases on network filesystems.
 
-- Docker Compose patterns  
-- Folder structures  
-- Naming conventions  
-- Environment variable management  
-- Git-backed infrastructure  
+### [Backup & Recovery](/homelab/backup-and-recovery/)
 
-:::tip
-Most homelab issues are not technical; they are organizational.
-:::
+Layered backups, retention, local/offsite copies, and restore testing.
+
+### [Disaster Recovery Runbook](/homelab/disaster-recovery/)
+
+Recovery order, full-host rebuilds, key recovery, offsite planning, and restore drills.
+
+---
+
+## 🧠 Local AI
+
+### [Self-Hosted AI](/homelab/self-hosted-ai/)
+
+Local LLMs, embeddings, image generation, speech recognition, text-to-speech, GPU allocation, and safe agent architecture.
+
+Local AI belongs in the homelab when it provides a real benefit: privacy, latency, capability, or independence — not simply because a GPU is available.
+
+---
+
+## 📊 Monitoring & Management
+
+### [Homelab Monitoring & Management](/homelab/monitoring-and-management/)
+
+Host reachability, system metrics, Docker management, service health, storage capacity, GPU monitoring, and actionable alerting.
+
+> Monitor what predicts outages and data loss, not what produces the prettiest dashboard.
+
 ---
 
 ## 🧱 Design Philosophy
 
 RebelRx Homelab is built around:
 
-- Local-first infrastructure  
-- Minimal external dependencies  
-- Clear separation of services  
-- Reproducible setups  
+- Local-first infrastructure
+- Minimal external dependencies
+- Clear separation of services
+- Reproducible deployments
+- Git-managed configuration
+- Explicit storage boundaries
+- Tested backups
+- Private-by-default administration
 
 It avoids:
 
-- Over-engineering for the sake of complexity  
-- Blindly copying configs without understanding them  
-- “Set it and forget it” systems that silently break  
+- Over-engineering for the sake of complexity
+- Blindly copying configurations without understanding them
+- Publicly exposing admin interfaces for convenience
+- Treating RAID as backup
+- Treating a running container as proof an application is healthy
+- “Set it and forget it” systems that silently decay
 
 ---
 
-## 🚧 Guides In Development
+## 🧭 A Sensible Learning Order
 
-- Self-Hosted Retro Gaming with RomM  
+If you are building from scratch:
+
+1. Install a clean Linux server
+2. Configure private administration
+3. Install Docker
+4. Adopt a standard stack layout
+5. Put configuration in Git
+6. Add NAS storage deliberately
+7. Add backups before irreplaceable data
+8. Add monitoring
+9. Add higher-level services
+10. Test disaster recovery
+
+---
+
+## 🚧 Future Guides
+
+- Self-Hosted Retro Gaming with RomM
+- Home Assistant infrastructure integration
+- Reverse-proxy and identity architecture
 
 ---
 
@@ -125,4 +143,4 @@ Cloud platforms optimize for scale and data aggregation.
 
 Your homelab should optimize for:
 
-> Control, reliability, and understanding.
+> Control, reliability, recoverability, and understanding.

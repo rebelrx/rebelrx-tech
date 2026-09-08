@@ -119,6 +119,6 @@ RebelRx exists to help you:
 
 RebelRx Tech does **not** use tracking cookies, analytics, or third-party tracking scripts.
 
-No personal data is collected.
+The site does not intentionally use analytics or tracking cookies. Hosting logs and third-party resources may still process technical request data; see the [Privacy Policy](/privacy-policy/) for details.
 
 > No tracking. No surveillance. No data harvesting.

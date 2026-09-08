@@ -1,426 +1,397 @@
 ---
-title: "🧪 RebelRx Privacy Setup"
+title: "🧪 RebelRx Setup"
 description: >-
-  The complete RebelRx stack — hardware, operating systems, self-hosted services, and the privacy tools actually in daily use.
----
-This is my own real-world, privacy-first stack designed for **control, performance, and usability**.
-
-I run this setup daily and will continuously update these sections as newer and better services become available.
-
+  The current RebelRx hardware and infrastructure setup — personal systems, servers, AI compute, storage, networking, and backup architecture.
 ---
 
-## 🧭 Philosophy
+This is the hardware and infrastructure I actually use every day.
 
-This setup is built around:
+It has grown considerably over time, but the goal has stayed the same: build a setup that gives me **control, performance, flexibility, and privacy** without making the environment unnecessarily fragile or difficult to maintain.
 
-- **Ownership** → Your data stays under your control  
-- **Practicality** → Tools must actually work day-to-day  
-- **Scalability** → Can grow with your needs  
-- **Security** → No unnecessary exposure  
+This page intentionally stays at the **system and architecture level** for general reference.
 
-> 💡 This is not a “maximum privacy” setup. It's a **balanced, usable system**.
+> 💡 Much of my infrastructure was built prior to the AI-driven memory price surges in 2025. Current PC pricing does
+significantly limit the ability to invest in self-hosted hardware. Procuring used or refurbished enterprise gear can help offset costs. Also, many self-hosted apps don't have excessive compute requirements so cheaper mini PCs or old laptops/desktops can be used.
 
 ---
 
-## 🖥️ Hardware Overview
+### 🧭 Design Philosophy
 
-My setup runs across a mix of **self-hosted infrastructure, dedicated appliances, and personal devices**, each serving a specific role.
+The setup is built around a few simple principles:
 
----
+- **Ownership** → Keep important data and infrastructure under my control when possible
+- **Separation of concerns** → Give major systems clear roles instead of making one machine responsible for everything
+- **Local-first computing** → Run workloads locally when doing so provides meaningful privacy, performance, or resilience benefits
+- **Practicality** → Use mainstream platforms when they are the best tool for the job, even when they are not my philosophical preference
+- **Scalability** → Expand individual parts of the environment without having to rebuild everything else
+- **Recoverability** → Back up configurations and irreplaceable data so hardware failure is inconvenient, not catastrophic
 
-## 🧱 Core Infrastructure
-
-### Minisforum MS-A2 (Primary Server)
-
-- **OS:** Devuan (bare metal)
-- **Role:** Core Docker host
-
-> 💡 This is the backbone of my entire system
-
-👉 Check out the selection of Minisforum Work Station Mini: <https://www.minisforum.com/collections/station-mini-series>
-
----
-
-### QNAP TS-h1277AXU-RP (NAS)
-
-- **Role:** Bulk storage + backups
-- Stores:
-  - Media libraries
-  - Nextcloud data
-  - Backups
-  - Archives (ROMs, documents, etc.)
-
-> 💡 Separating compute (server) from storage (NAS) improves flexibility and resilience
-
-👉 Check out the selection of QNAP NAS solutions: <https://www.qnap.com/en-us/product>
+> 💡 This is not intended to be a blueprint everyone should copy. It is a real-world setup that evolved around my own workloads and interests.
 
 ---
 
 ## 💻 Personal Systems
 
-### Custom Ryzen 9 PC (Windows 11)
+These are the machines I use at my desk.
 
-- **Role:** Gaming + Windows-only applications
-- Used for:
-  - High-performance workloads
-  - Compatibility with non-Linux software
+### Custom Ryzen Desktop
 
-👉 Check out Micro Center, computer retailer, for nearest locations to you: <https://www.microcenter.com/>
+My primary everyday desktop and gaming PC is a self-built AMD system.
 
----
+- **CPU:** AMD Ryzen 9 9950X3D
+- **GPU:** ASUS ROG Astral GeForce RTX 5090
+- **Memory:** 96GB DDR5
+- **OS:** Windows 11
+- **Role:** Main desktop, gaming, and Windows applications
 
-### Framework Desktop (Artix Linux)
-
-- **Role:** Secondary workstation
-- Used for:
-  - General productivity
-  - Linux-first workflows
-
-👉 Check out the Framework Desktop: <https://frame.work/marketplace/desktops>
+The RTX 5090 makes the system exceptionally capable for gaming and GPU-accelerated desktop workloads, while the 9950X3D also gives it enough CPU performance for demanding productivity work.
 
 ---
 
-### Framework 13 Laptop (Artix Linux)
+### [Framework Desktop](https://frame.work/desktop)
 
-- **Role:** Travel + development machine
-- Used for:
-  - Remote access (via Tailscale)
-  - Managing my home infrastructure
-  - Lightweight productivity
+The Framework Desktop is my primary Linux desktop outside of the dedicated AI workstation.
 
-👉 Check out the selection of Framework laptops: <https://frame.work/marketplace/laptops>
+- **OS:** Fedora KDE Plasma
+- **Role:** Linux productivity and general desktop use
+
+Fedora gives me a current Linux desktop environment with excellent hardware support, while KDE Plasma provides the desktop workflow I prefer.
+
+👉 See my [Fedora KDE Desktop Installation Guide](/linux/fedora-kde-install/).
 
 ---
 
-## 🎮 Gaming & Emulation
+### [Framework Laptop 13 Pro](https://frame.work/laptop13pro)
 
-### Raspberry Pi 5 (8GB)
+My primary laptop is an Intel-based Framework Laptop 13 Pro.
 
-- **OS:** Batocera
-- **Additional:** MiSTer FPGA
-- **Role:** Retro gaming / emulation
+- **OS:** Artix Linux
+- **Desktop:** KDE Plasma
+- **Init:** OpenRC
+- **Role:** Portable Linux workstation, remote administration, and general productivity
 
-👉 Check out the Vilros, tech supplier, selection of Raspberry Pi boards and accessories: <https://vilros.com/>
+This remains one of the systems where I can use my preferred non-systemd Linux environment without compromising what I need from the hardware.
+
+👉 See my [Artix KDE + OpenRC Installation Guide](/linux/artix-kde-openrc-install/).
+
+---
+
+## 🧱 Core Server Infrastructure
+
+The rack contains the systems that provide persistent compute, storage, testing, automation, and AI capacity for the rest of the environment.
+
+### Primary Server — [Minisforum MS-A2 Mini Workstation](https://store.minisforum.com/products/minisforum-ms-a2-workstation)
+
+The MS-A2 is the general-purpose server at the center of the environment.
+
+- **CPU:** AMD Ryzen 9 9955HX
+- **GPU:** NVIDIA RTX 2000E 16GB
+- **Memory:** 96GB DDR5
+- **Storage:** Multiple NVMe SSDs
+- **OS:** Debian 13
+- **Role:** Primary general-purpose server and application host
+
+I moved this system to Debian because it is an extremely well-supported server platform and a useful reference point alongside my preferred Devuan-based approach.
+
+👉 See my [Debian 13 Server Installation Guide](/linux/debian-server-install/).
+
+---
+
+### Virtualization Lab — [Beelink SER9 MAX](https://www.bee-link.com/products/beelink-ser9-max-amd-ryzen-7-h-255) 
+
+Rather than testing operating systems and potentially disruptive changes on production hardware, I keep a dedicated Proxmox system for experimentation.
+
+- **CPU:** AMD Ryzen 7 H 255
+- **Memory:** 64GB DDR5
+- **Storage:** NVMe SSD
+- **Hypervisor:** Proxmox VE
+- **Role:** Virtual machines, Linux distribution testing, and build validation
+
+This is where I can test clean installs, document installation procedures, and experiment with operating systems without risking the systems I depend on every day.
+
+For example, this environment was useful while developing and validating my Devuan server build.
+
+---
+
+### Windows Utility Workstation — [Minisforum MS-S1 MAX AI Workstation](https://store.minisforum.com/products/minisforum-ms-s1-max-mini-pc)
+
+Some workloads are better handled by a powerful Windows machine that can run independently of my main desktop.
+
+- **CPU:** AMD Ryzen AI Max+ 395
+- **Graphics:** Radeon 8060S
+- **Memory:** 128GB
+- **Storage:** High-capacity NVMe storage
+- **OS:** Windows 11
+- **Role:** General Windows utility workstation
+
+I primarily use it for:
+
+- Disc ripping
+- Large file conversions
+- ROM and game-library management
+- CPU-intensive batch workloads
+- Other long-running Windows tasks that I do not want tying up my main desktop
+
+---
+
+## 🤖 Local AI & GPU Compute
+
+Local AI has become a substantial part of the lab, so I separate heavy GPU inference from agent orchestration and general-purpose server workloads.
+
+### Threadripper PRO AI Workstation
+
+This is the main local GPU compute system and by far the most powerful machine in the environment.
+
+- **CPU:** AMD Ryzen Threadripper PRO 9975WX, 32 cores
+- **GPU:** 2 × NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 96GB each
+- **Total GPU memory:** 192GB VRAM
+- **Memory:** 256GB ECC DDR5
+- **OS:** Fedora 44 KDE Plasma
+- **Role:** Local AI inference, GPU compute, model experimentation, and high-end workstation workloads
+
+The system is intentionally built around large local models and GPU-heavy workloads. Local NVMe storage is used primarily for active AI models and working data rather than long-term archival storage.
+
+Those working datasets and configurations are backed up separately to network storage.
+
+---
+
+### [NVIDIA DGX Spark](https://www.nvidia.com/en-us/products/workstations/dgx-spark/)
+
+The DGX Spark serves a different purpose from the large GPU workstation.
+
+- **Platform:** NVIDIA DGX Spark
+- **OS:** DGX OS
+- **Storage:** 4TB NVMe
+- **Role:** AI agent and orchestration system
+
+I use it primarily as the control/orchestration layer for agentic AI workflows, including **Hermes Agent**. Heavy inference can be delegated to my AI workstation or cloud models (e.g., ChatGPT, Claude).
+
+Separating orchestration from the primary GPU workstation keeps the AI environment much more flexible.
+
+---
+
+## 💾 Storage Architecture
+
+Storage is deliberately separated from compute.
+
+### Bulk NAS Storage - [QNAP TS-h1277AXU-RP](https://www.qnap.com/en-us/product/ts-h1277axu-rp)
+
+Two rack-mounted QNAP 12-bay NAS systems provide the bulk storage layer.
+
+The arrays are **independent storage pools with different content**, rather than simple mirrors of one another.
+
+Their primary uses are:
+
+- Media libraries
+- Long-term archival storage
+- Large datasets
+- Centralized network storage
+
+One system uses 12 × 24TB enterprise hard drives, while the other uses 12 × 20TB drives, providing substantial raw storage capacity across the two arrays.
+
+> 💡 Keeping bulk storage separate from compute means servers and workstations can be replaced or rebuilt without moving the underlying data architecture with them.
+
+---
+
+### High-Speed Application Storage — [QNAP TBS-h574TX NASbook](https://www.qnap.com/en-us/product/tbs-h574tx)
+
+A QNAP all-flash NAS provides a separate high-speed storage tier.
+
+- **Storage:** 5 × 3.84TB flash drives
+- **Usable role:** Fast shared storage for self-hosted data-intensive applications
+- **Protocol:** NFS where appropriate
+
+I use this tier for workloads where latency and responsiveness matter more than maximum capacity, including private cloud storage and document-management data.
+
+Use this tier for application-supported document/upload storage; keep SQLite and other locking-sensitive live databases on local disks unless the application explicitly supports the network-storage configuration. See [NAS Mounting](/homelab/nas-mounting/).
+
+This keeps supported application data off the bulk media arrays while also avoiding dependence on storage inside a single compute host.
+
+---
+
+### Off-Site Disaster Recovery - [Hetzner](https://www.hetzner.com/)
+
+Local redundancy does not protect against every failure scenario.
+
+I therefore maintain separate **off-site storage** for disaster recovery of important media and archival data.
+
+The goal is not to make the remote system part of the live storage environment. It exists as an independent recovery target if the local storage environment suffers a major failure or loss.
+
+👉 See the [Disaster Recovery Runbook](/homelab/disaster-recovery/).
+
+---
+
+## 🌐 Network Architecture
+
+The wired backbone of the lab is built around **10 Gigabit Ethernet**, with a [QNAP QSW-M3224-24T](https://www.qnap.com/en-us/product/qsw-m3224-24t) managed 10GbE switch serving as the core LAN switch.
+
+My Internet connection is multi-gigabit fiber, so the internal network has enough capacity that communication between workstations, servers, and storage does not become the bottleneck for most workloads.
+
+I also separate **IoT** and **guest** devices from the primary network rather than treating every device in the house as equally trusted.
+
+---
+
+### DNS & Network Privacy
+
+Network-wide DNS filtering uses a primary/secondary design:
+
+- **AdGuard Home** → Primary DNS filtering
+- **Pi-hole** → Secondary/backup DNS filtering
+
+This gives me network-level blocking while retaining a second DNS filtering path if the primary service is unavailable.
+
+👉 See [DNS & Network Privacy](/homelab/dns-and-network-privacy/).
+
+---
+
+### Remote Access
+
+I use **Tailscale** as the primary private remote-access layer for infrastructure administration.
+
+Selected web services can also be presented through a reverse proxy where appropriate, but I avoid exposing internal management interfaces unnecessarily.
+
+👉 See my [Tailscale Guide](/homelab/tailscale/).
 
 ---
 
 ## 🏠 Dedicated Appliances
 
-### Beelink Mini S13
+Some systems are deliberately kept single-purpose rather than folded into the primary server.
 
-- **Role:** Smart home automation
+### Home Assistant
+
+A [Beelink Mini S13](https://www.amazon.com/dp/B0BTBPC6TY) is dedicated entirely to Home Assistant OS.
+
+- **CPU:** Intel N150
+- **Memory:** 16GB
+- **Storage:** 500GB NVMe
 - **OS:** Home Assistant OS
+- **Role:** Smart-home automation
 
-👉 Check out the selection of Beelink mini PC: <https://www.bee-link.com/collections/product>
-
----
-
-### Umbrel Home
-
-- **Role:** Bitcoin node
-- Runs:
-  - Full BTC node
-  - Lightning
-
-👉 Check out the selection of Umbrel devices: <https://umbrel.com/>
+Running Home Assistant on dedicated hardware keeps home automation independent of maintenance or failures affecting the general server environment.
 
 ---
 
-### Intel NUC 13
+### Pi-hole
 
-- **Role:** Audio server
-- **OS:** Roon ROCK
+A [Raspberry Pi 4B](https://www.raspberrypi.com/products/raspberry-pi-4-model-b/) provides the secondary DNS filtering service.
 
-👉 Check out B&H for their selection of NUCs and pro tech gear: <https://www.bhphotovideo.com/>
+- **Role:** Backup DNS filtering
+- **Primary DNS:** AdGuard Home elsewhere in the infrastructure
 
----
-
-## 🧠 Design Philosophy
-
-Each device has a **clear, single responsibility**:
-
-- Server → Compute (Docker workloads)
-- NAS → Storage
-- Clients → Interaction (desktop/laptop)
-- Appliances → Specialized tasks
-
-> 💡 This separation keeps the system:
->
-> - Easier to maintain  
-> - More resilient  
-> - Easier to scale  
+Using a physically separate small device for secondary DNS gives the network a useful fallback when performing maintenance on the primary server environment.
 
 ---
 
-## ✅ Why This Setup Fits My Needs
+### [Umbrel Home](https://umbrel.com/umbrel-home)
 
-- No single point of failure for everything  
-- Clear separation of concerns  
-- Optimized performance per device  
-- Flexibility to upgrade individual components  
+An Umbrel Home is used as a dedicated **local Bitcoin node**.
 
----
+Keeping this workload on its own appliance makes it easy to operate independently from the rest of the self-hosted infrastructure.
 
-## 🚀 Final Hardware Thought
-
-But, you don’t need this much hardware to get started.
-
-This setup evolved over time—  
-start small, and expand as your needs grow.
+👉 Learn more about Umbrel: <https://umbrel.com/>
 
 ---
 
-## 🧱 Core Architecture
+### Roon ROCK Server
 
-- **Docker-based deployment**
-- **NAS-backed storage**
-- **Reverse proxy (Nginx Proxy Manager)**
-- **Private access via Tailscale (no port forwarding)**
+An Intel NUC11 is dedicated exclusively to Roon ROCK, my Roon music server.
 
----
+- **CPU:** Intel Core i7-1165G7
+- **Role:** Dedicated Roon music server
 
-## ☁️ Data & Productivity
-
-### Nextcloud AIO
-
-- Files
-- Calendar (CalDAV)
-- Contacts (CardDAV)
-- NAS-backed storage
-
-### Cloud Storage (Hosted)
-
-- pCloud.com
+Roon is one of the workloads I prefer to keep appliance-like: the system exists for one purpose and generally does not need to be touched.
 
 ---
 
-## 📧 Email
+## 🔌 Out-of-Band Management - [GL.iNet GL-RM10 Comet Pro Remote KVM](https://www.gl-inet.com/en-us/products/gl-rm10?country=US)
 
-- Proton Mail
+Several important systems use dedicated remote KVM hardware.
 
----
+This gives me console-level access even when an operating system is unavailable, networking inside the host is misconfigured, or a machine needs BIOS/UEFI-level intervention.
 
-## 📸 Photos
+For a rack containing multiple servers and compute systems, remote KVM access is one of those features that seems optional until the first time it saves a trip to the rack.
 
-### Immich
-
-- Google Photos replacement
-- Fast, modern UI
-- Fully self-hosted
+👉 Learn more about [GL.iNet Remote KVMs](https://www.gl-inet.com/en-us/collections/remote-kvms?country=US)
 
 ---
 
-## 📝 Office
+## 💽 Backup Strategy
 
-### ONLYOFFICE
+Backups are designed around the idea that **configuration, application data, and irreplaceable working data matter more than the operating-system installation itself**.
 
-- Microsoft Office 365 replacement
-- Full productivity suite (document, spreadsheet, presentation, pdf, and forms editors)
-- Free and open-source
+I use **Kopia** to protect the important data from the primary server, AI workstation, and DGX Spark, including items such as:
 
----
+- Infrastructure configuration
+- Application data
+- AI models and related working data
+- Important local datasets
 
-## 📄 PDFs & Documents
+Backups are written to local NAS storage, while separate off-site storage provides another recovery layer for large media and archival collections.
 
-- Sumatra PDF (lightweight reader)
-- BentoPDF (PDF tooling)
-- Paperless-ngx (document archive)
+This makes rebuilding a failed compute node significantly easier because the system itself can be reinstalled while the important state is restored from backup.
 
----
-
-## 📝 Notes & Knowledge
-
-### Joplin
-
-- Markdown-based
-- Cross-platform
-- Sync via Nextcloud
-
-### Paperless-ngx
-
-- Document management system
-- OCR + tagging
-- Replaces paper clutter
+👉 See [Backup & Recovery](/homelab/backup-and-recovery/) and the [Disaster Recovery Runbook](/homelab/disaster-recovery/).
 
 ---
 
-## 🔐 Security & Identity
+## 🧠 Why the Environment Is Split This Way
 
-### Password Manager
+At first glance, using this many systems can look unnecessarily complicated. In practice, the separation is intentional.
 
-- Proton Pass (hosted alternative)
+| System type | Primary responsibility |
+|---|---|
+| Personal desktops/laptop | Interaction, productivity, gaming |
+| General server | Persistent self-hosted compute |
+| Virtualization host | Testing and disposable environments |
+| AI workstation | Heavy GPU inference and compute |
+| DGX Spark | AI agent orchestration |
+| Bulk NAS systems | Media and archival storage |
+| Flash NAS | High-speed application data |
+| Home Assistant appliance | Home automation |
+| Roon appliance | Music server |
+| Umbrel appliance | Bitcoin node |
+| Off-site storage | Disaster recovery |
 
-### 2FA
+The advantage is that I can upgrade, rebuild, or experiment with one layer without necessarily disrupting the others.
 
-- Enabled across all services
-- Passkeys when available
+For example:
 
----
-
-## 🌍 Network & Privacy Layer
-
-### DNS Blocking
-
-- AdGuard Home
-- Network-wide ad + tracker blocking
-
-### VPN
-
-- Mullvad (privacy-first external VPN)
-
-### Private Access
-
-- Tailscale
-- Secure remote access to services
-- No exposed ports
+- Reinstalling the AI workstation does not affect bulk storage.
+- Testing a Linux distribution happens on the virtualization host rather than a production server.
+- Server maintenance does not take Home Assistant offline.
+- A failed workstation does not contain the only copy of important data.
 
 ---
 
-## 🌐 Browser
+## ✅ What This Architecture Gives Me
 
-- Brave
-  - Built-in ad/tracker blocking
-  - Minimal extensions required
+The current setup provides:
 
----
-
-## 🎥 Media & Entertainment
-
-### Jellyfin
-
-- Self-hosted streaming
-- Replaces Netflix / HBO / streaming services
-
-### Arr Stack
-
-- Sonarr
-- Radarr
-- Prowlarr
-- Automated media management
+- High-performance local compute
+- Large local AI inference capacity
+- Independent AI orchestration
+- Fast 10GbE access to centralized storage
+- Separate high-speed and bulk storage tiers
+- Dedicated environments for virtualization and testing
+- Secure remote administration
+- Segmentation for less-trusted devices
+- Local and off-site recovery options
+- The ability to replace individual systems without redesigning the entire environment
 
 ---
 
-## 📚 Books & Audio
+## 🚀 Final Thought
 
-### Calibre-Web / Kavita
+You absolutely **do not need this much hardware to build a useful home lab**.
 
-- Ebook libraries
+This environment accumulated over years as my interests expanded from privacy and self-hosting into storage, home automation, networking, local AI, virtualization, and GPU computing.
 
-### Audiobookshelf
+A much smaller setup can follow the same principles:
 
-- Audiobooks + podcasts
-- Fully self-hosted
+1. Start with one reliable server.
+2. Keep good backups.
+3. Separate important storage from disposable compute when it becomes worthwhile.
+4. Add dedicated systems only when a workload actually benefits from them.
 
----
-
-## 💰 Finance
-
-### Actual Budget
-
-- Self-hosted budgeting
-- Privacy-first alternative to Mint/YNAB
-
----
-
-## 🧰 Development & Infrastructure
-
-### Git
-
-- Forgejo (self-hosted Git service)
-
-### Editor
-
-- VSCodium (telemetry-free VS Code)
-
----
-
-## 🌐 Network Tools
-
-- LibreSpeed
-- Speedtest-tracker
-
-Self-hosted network performance testing without tracking.
-
----
-
-## 🔁 What This Setup Replaces
-
-| Big Tech | Replacement |
-|---------|------------|
-| Google Drive | Nextcloud |
-| Google Photos | Immich |
-| Google Calendar | Nextcloud |
-| Google Contacts | Nextcloud |
-| Gmail | Proton Mail / Tuta |
-| Chrome Passwords | Proton Pass |
-| Chrome | Brave |
-| Google Docs (partial) | Nextcloud + Joplin |
-| Netflix / HBO | Jellyfin + Arr stack |
-| Kindle / Audible | Calibre-Web / Audiobookshelf |
-| Adobe Acrobat | Sumatra PDF / BentoPDF |
-| Mint / YNAB | Actual Budget |
-| GitHub | Forgejo |
-| ISP DNS | AdGuard Home / Pi-hole |
-| Speedtest.net | LibreSpeed / Speedtest-tracker |
-
----
-
-## 🧠 Design Principles
-
-### 1. Local-First Where Possible
-
-Data lives:
-
-- On your server
-- On your NAS
-
----
-
-### 2. Self-Host When It Adds Value
-
-Not everything needs to be self-hosted.
-
-Balanced approach:
-
-- Self-host → core data (files, photos, passwords)
-- Hosted → convenience (email if preferred)
-
----
-
-### 3. Secure by Default
-
-- No exposed ports
-- Access via Tailscale only
-- Reverse proxy for internal routing
-
----
-
-### 4. Keep It Maintainable
-
-- Docker-based services
-- Clear directory structure
-- Version-controlled configs (Forgejo)
-
----
-
-## ⚖️ Why This Setup Works
-
-- High control over data  
-- Minimal ongoing cost  
-- Scalable architecture  
-- Secure remote access  
-- Works across all devices  
-
----
-
-## 🚀 Final Thought on Infrastructure
-
-This isn’t the only way to do it and certainly not perfect!
-
-But, it’s a **battle-tested, real-world setup** that balances:
-
-- Privacy  
-- Usability  
-- Reliability  
-
-> 🧠 The goal isn’t perfection; it’s **control without friction**.
+> 🧠 The goal is not to own the most hardware. The goal is to build infrastructure that remains useful, understandable, and recoverable as your needs grow.

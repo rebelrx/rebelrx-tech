@@ -95,6 +95,8 @@ Use of this site is at your own risk.
 
 ---
 
+<a id="affiliate-referral-disclosure"></a>
+
 ## 💸 Affiliate and Referral Disclosure
 
 Some links on this site are referral or affiliate links, including the RebelRx Holistic Dispensary (Fullscript).

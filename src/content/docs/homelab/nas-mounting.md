@@ -20,9 +20,9 @@ Both work. Pick based on what's talking to what:
 | | NFS | SMB / CIFS |
 | :--- | :--- | :--- |
 | Best for | Linux ↔ Linux / NAS | Mixed networks (Windows, printers, scanners) |
-| Performance | Faster, lower overhead | Slightly heavier |
+| Performance | Workload and implementation dependent | Workload and implementation dependent |
 | Permissions | Unix UID/GID, native | Mapped at mount time |
-| Auth model | Host/IP-based (v3/v4) | Username + password |
+| Auth model | Often AUTH_SYS + export restrictions; Kerberos is also supported | Username + password |
 | Verdict | **Default choice for a Linux homelab** | Use when NFS isn't available or Windows shares the data |
 
 This guide covers both — NFS as the primary path.
@@ -37,7 +37,7 @@ On the NAS (QNAP, Synology, TrueNAS — the UI differs, the concepts don't):
 2. Enable the **NFS service** and add an NFS rule for the share:
     - Allowed client → your server's IP (or Tailscale IP if mounting over the tailnet)
     - Access → read/write
-    - Squash → *no root squash* only if Docker containers must write as root; otherwise map to a specific UID/GID
+    - Squash → retain root squashing; align the application's UID/GID or use a narrowly scoped mapping. Avoid granting remote root write access
 3. For SMB → create a dedicated low-privilege NAS user for the server; never mount with the NAS admin account
 
 :::tip[One share per purpose]
@@ -65,12 +65,12 @@ sudo apt install -y cifs-utils
 Never go straight to `fstab`. Prove the mount works interactively:
 
 ```bash
-# See what the NAS exports
-showmount -e 192.168.1.xx
+# NFSv3-style export discovery; NFSv4-only servers may not support showmount
+showmount -e NAS-IP
 
 # Create the mount point and test
 sudo mkdir -p /mnt/nas/media
-sudo mount -t nfs -o vers=4.1 192.168.1.xx:/media /mnt/nas/media
+sudo mount -t nfs -o vers=4.1 NAS-IP:/media /mnt/nas/media
 
 # Verify: list it, write to it, read it back
 ls /mnt/nas/media
@@ -98,8 +98,8 @@ sudo nano /etc/fstab
 Add one line per share:
 
 ```text
-192.168.1.xx:/media    /mnt/nas/media    nfs    rw,hard,vers=4.1,_netdev,nofail    0    0
-192.168.1.xx:/backups  /mnt/nas/backups  nfs    rw,hard,vers=4.1,_netdev,nofail    0    0
+NAS-IP:/media    /mnt/nas/media    nfs    rw,hard,vers=4.1,_netdev,nofail    0    0
+NAS-IP:/backups  /mnt/nas/backups  nfs    rw,hard,vers=4.1,_netdev,nofail    0    0
 ```
 
 What each option buys you:
@@ -107,7 +107,7 @@ What each option buys you:
 - `hard` → if the NAS drops, I/O **waits** for it to return instead of silently returning errors and corrupting writes. Correct for data you care about.
 - `vers=4.1` → pin the protocol version; no negotiation surprises after NAS firmware updates
 - `_netdev` → tells the init scripts this needs networking first — **essential on sysvinit**
-- `nofail` → a powered-off NAS won't hang the server's entire boot
+- `nofail` → a failed mount is not treated as a required filesystem; this is not a guarantee of bounded mount time, especially across different init scripts
 
 Apply and verify:
 
@@ -136,7 +136,7 @@ sudo chmod 600 /root/.smb-credentials
 Then in `/etc/fstab`:
 
 ```text
-//192.168.1.xx/media  /mnt/nas/media  cifs  credentials=/root/.smb-credentials,uid=1000,gid=1000,vers=3.0,_netdev,nofail  0  0
+//NAS-IP/media  /mnt/nas/media  cifs  credentials=/root/.smb-credentials,uid=1000,gid=1000,vers=3.0,_netdev,nofail  0  0
 ```
 
 The `uid=1000,gid=1000` maps every file to your user — set it to match the `PUID`/`PGID` your [Docker stacks](/homelab/docker-home-lab/) run as.
@@ -145,7 +145,7 @@ The `uid=1000,gid=1000` maps every file to your user — set it to match the `PU
 
 ## 🔁 Boot Behavior Without systemd
 
-On Devuan, the sysvinit boot sequence handles this correctly **because of `_netdev`**: the `mountnfs` stage runs after networking is up and mounts everything fstab marks as network-dependent. No units, no automount configs — the 30-year-old mechanism just works.
+On Devuan, the sysvinit boot sequence handles this correctly **because of `_netdev`**: the `mountnfs` stage runs after networking is up and mounts everything fstab marks as network-dependent. This orders mount attempts, but does not prove the NAS is reachable or prevent Docker from starting after a failed mount. Test both online and offline NAS boots.
 
 Verify after your next reboot:
 
@@ -177,43 +177,23 @@ Defenses, in order of value:
 
 **1. Let the boot order do its job.** On sysvinit, `mountnfs` runs before the Docker init script — with `_netdev` set, an *online* NAS is mounted before containers start. The risk is the NAS being slow or offline (which `nofail` deliberately allows).
 
-**2. Guard the stacks that depend on the mount.** Add a check to the Docker init sequence — create `/etc/init.d/wait-for-nas`:
+**2. Make startup fail closed for dependent stacks.** A delay script that eventually exits successfully does not guard anything. Keep unrelated local-only services running, but start a NAS-dependent stack only after checking the expected mounted filesystem:
 
 ```bash
-#!/bin/sh
-### BEGIN INIT INFO
-# Provides:          wait-for-nas
-# Required-Start:    $network $remote_fs
-# Required-Stop:
-# Default-Start:     2 3 4 5
-# Default-Stop:
-# X-Start-Before:    docker
-# Short-Description: Delay boot until NAS shares are mounted
-### END INIT INFO
-
-case "$1" in
-  start)
-    for i in $(seq 1 30); do
-      mountpoint -q /mnt/nas/media && exit 0
-      sleep 2
-    done
-    echo "wait-for-nas: NAS not mounted after 60s, continuing anyway"
-    ;;
-  *) ;;
-esac
-exit 0
+mountpoint -q /mnt/nas/media || { echo "Required NAS mount missing"; exit 1; }
+findmnt -rn -M /mnt/nas/media -t nfs,nfs4 >/dev/null ||
+  { echo "Expected NFS filesystem missing"; exit 1; }
+test -f /mnt/nas/media/.nas-mounted ||
+  { echo "Expected share marker missing"; exit 1; }
+cd /opt/docker/stacks/example || exit 1
+docker compose up -d
 ```
 
-```bash
-sudo chmod +x /etc/init.d/wait-for-nas
-sudo update-rc.d wait-for-nas defaults
-```
+Create the marker on the verified remote share first. Check the expected export/source as well when different shares could use the same mount point.
 
-**3. Make the emptiness detectable.** Place a marker file on the NAS share (`touch /mnt/nas/media/.nas-mounted` while it's mounted). Any script — backups especially — can then refuse to run against an unmounted path:
+**3. Account for automatic restarts.** A wrapper around `compose up` cannot guard containers that Docker restarts on its own. For NAS-dependent services, either disable Docker auto-start and use a mount-aware service supervisor, or implement and test a host-specific dependency arrangement that blocks their startup when storage is absent. On systemd use appropriate mount dependencies; on sysvinit/OpenRC use the matching service mechanism. Do not copy systemd units onto Devuan.
 
-```bash
-[ -f /mnt/nas/media/.nas-mounted ] || { echo "NAS not mounted, aborting"; exit 1; }
-```
+A marker-file read can itself block on an unavailable hard mount. It is an identity check, not a bounded health probe.
 
 > The marker-file trick costs nothing and has saved more homelab data than any other three lines in this guide.
 
@@ -224,16 +204,15 @@ sudo update-rc.d wait-for-nas defaults
 :::danger[Never run SQLite databases over NFS or SMB]
 The Arr stack (Sonarr, Radarr, Prowlarr…), Jellyfin, and many homelab
 apps use **SQLite**, which depends on file locking that network
-filesystems implement unreliably. Databases on NAS mounts corrupt —
-not *if*, *when*.
+filesystems implement unreliably. Network locking and failure semantics can cause corruption or unsupported behavior. Follow the application's storage requirements.
 
 The rule from the [Docker guide](/homelab/docker-home-lab/) already handles this:
 
-- App data and databases → `/opt/data/<stack>` on **local disk**
+- App data and databases → `/opt/docker/data/<stack>` on **local disk**
 - Bulk media, documents, backups → NAS mount
 :::
 - Don't mount with the NAS admin account — dedicated low-privilege user, per share
-- Don't use `soft` mounts for anything that writes — silent partial writes are how files corrupt. (The [Devuan server guide](/linux/devuan-server-install/) deliberately uses `soft` for read-mostly shares to keep a headless box responsive — that's the other side of this tradeoff)
+- Use `hard` as the default for both read and write mounts. `soft` is an exceptional, application-tested availability tradeoff, not a safe default for backups. See [nfs(5)](https://man7.org/linux/man-pages/man5/nfs.5.html).
 - Don't put credentials in `fstab` — credentials file, `chmod 600`
 - Don't skip the interactive test mount — fstab is where you *record* a working mount, not where you *discover* a broken one
 

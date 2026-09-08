@@ -13,7 +13,7 @@ Most homelab guides assume Debian, Ubuntu, or some other systemd distro. This on
 
 You *can* use Proxmox. Many people do.
 
-But for most homelabs, it introduces unnecessary complexity.
+For this Docker host, I prefer bare metal because it reduces the number of layers to maintain. A dedicated hypervisor remains useful for OS testing, snapshots, and stronger workload isolation—as in [my setup](/privacy/my-setup/).
 
 ### ❌ Proxmox Challenges
 
@@ -31,9 +31,9 @@ But for most homelabs, it introduces unnecessary complexity.
 - **Simple** → one OS, one system to manage  
 - **Fast deployments** → spin up services in seconds  
 - **Reproducible** → everything defined in Compose  
-- **Portable** → move your entire stack with Git  
+- **Portable** → move configuration with Git, then restore secrets and application data separately  
 
-> 💡 If you're not running enterprise multi-tenant workloads, you likely don't need a hypervisor.
+> 💡 Choose the isolation model for the workload. Containers share the host kernel; a VM provides a different boundary.
 
 ---
 
@@ -122,6 +122,8 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
+Membership in the `docker` group grants root-equivalent control. Add only trusted administrators.
+
 Test:
 
 ```bash
@@ -136,14 +138,14 @@ Keep **config and data in separate trees** — this is the single most important
 layout decision, and every stack in the repo follows it:
 
 ```bash
-/opt/stacks/<stack>/     # Docker Compose stacks (compose.yaml, .env, README)
-/opt/data/<stack>/       # Persistent app data (never committed to Git)
+/opt/docker/stacks/<stack>/     # Docker Compose stacks (compose.yaml, .env, README)
+/opt/docker/data/<stack>/       # Persistent app data (never committed to Git)
 ```
 
 Example:
 
 ```bash
-/opt/stacks/
+/opt/docker/stacks/
 ├── npm/
 │   ├── compose.yaml
 │   ├── .env
@@ -151,7 +153,7 @@ Example:
 ├── plex/
 └── ...
 
-/opt/data/
+/opt/docker/data/
 ├── npm/
 ├── plex/
 └── ...
@@ -160,12 +162,11 @@ Example:
 ### Why this matters
 
 - Separation of **config vs data**
-- Easier backups (snapshot `/opt/data`; the compose tree lives in Git)
+- Easier backups (snapshot `/opt/docker/data`; the compose tree lives in Git)
 - Cleaner Git repos (no runtime data ever versioned)
 - Avoids Docker "sprawl"
 
-> 💡 `/opt/stacks` is also Dockge's default `DOCKGE_STACKS_DIR`, so the stack
-> manager picks everything up with no extra configuration.
+> 💡 Configure Dockge's `DOCKGE_STACKS_DIR` explicitly as `/opt/docker/stacks` and mount the same path inside its container. The site's layout differs from Dockge's usual `/opt/stacks` example.
 
 ---
 
@@ -179,11 +180,11 @@ git clone https://github.com/rebelrx/rebelrx-homelab.git
 > This repo provides **real-world Compose templates** used in production, one
 > directory per stack, each with a filled-in `README.md`.
 
-To deploy a stack, copy it into `/opt/stacks/` and fill in its `.env`:
+Use the public repository as a template source. Review the current stack README and create your own private deployment repository at `/opt/docker/stacks/`, as described in [Git-Managed Homelab](/homelab/git-managed-homelab/). Copying a template is initial setup, not an ongoing synchronization strategy:
 
 ```bash
-sudo mkdir -p /opt/stacks
-sudo cp -a ~/rebelrx-homelab/stacks/npm /opt/stacks/
+sudo mkdir -p /opt/docker/stacks
+sudo cp -a ~/rebelrx-homelab/stacks/npm /opt/docker/stacks/
 ```
 
 ---
@@ -248,13 +249,13 @@ Only `.env.example` templates with blank secrets are committed.
 
 ```yaml
 volumes:
-  - /opt/data/plex:/config
+  - /opt/docker/data/plex:/config
 ```
 
 This ensures:
 
 - Data persists across container restarts
-- Easy backups (it's all under `/opt/data`)
+- Easy backups (it's all under `/opt/docker/data`)
 - Full control over storage
 
 ---
@@ -272,7 +273,7 @@ ports:
 - Web UIs are published on **all interfaces by default**, so they work on your
   LAN out of the box.
 - Prefix a mapping with `127.0.0.1:` to keep a service **loopback-only** and
-  reach it exclusively through the reverse proxy.
+  reach it through a host-based proxy or SSH tunnel. A containerized NPM reaches backends on a shared Docker network; its localhost is not the host's loopback.
 - **Internal services** (databases, Redis/Valkey, brokers) publish **no host
   port at all** — they're only reachable on the stack's internal network.
 
@@ -286,7 +287,7 @@ Recommended approach — the `npm` stack in the repo:
 - Expose services via subdomains
 - Handle SSL automatically
 
-Services attach to a shared `proxy_net` network; NPM reaches each one by
+Services attach to a shared `proxy` network in this guide (existing templates may use `proxy_net`; preserve or explicitly map their actual network name); NPM reaches each one by
 container name, so the reverse proxy works whether or not a host port is
 published.
 
@@ -309,9 +310,10 @@ Benefits:
 Start with the reverse proxy so everything else has something to sit behind:
 
 ```bash
-cd /opt/stacks/npm
+cd /opt/docker/stacks/npm
 
 cp .env.example .env
+chmod 600 .env
 nano .env
 ```
 
@@ -324,6 +326,8 @@ docker compose up -d
 ---
 
 ## 🔄 Updating Containers
+
+Read release notes, confirm a current application-consistent backup, and record the old image version before updating. Validate the application afterward. See [Docker Infrastructure Standards](/homelab/docker-infrastructure-standards/).
 
 ```bash
 docker compose pull
@@ -349,7 +353,7 @@ docker compose restart [service_name]
 
 ## 🧼 Cleanup
 
-Remove unused resources:
+Inspect resource usage first with `docker system df`. The following removes unused images, stopped containers, networks, and build cache; it can remove rollback images. Use it only after successful validation and after deciding what recovery artifacts to retain:
 
 ```bash
 docker system prune -a
@@ -365,8 +369,9 @@ Compose files can be owned by your user; **data** directories are usually owned
 by the container's `PUID:PGID` (often `1000:1000`):
 
 ```bash
-sudo chown -R $USER:$USER /opt/stacks/<stack>
-sudo chown -R 1000:1000 /opt/data/<stack>   # match the stack's PUID/PGID
+sudo chown -R $USER:$USER /opt/docker/stacks/<stack>
+# Set ownership only on new paths, using the image's documented UID/GID.
+# Do not recursively chown existing application or database data.
 ```
 
 ---
