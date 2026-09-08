@@ -1,5 +1,5 @@
 ---
-title: "Debian 13 Server Installation Guide"
+title: "Debian Server Installation Guide"
 description: >-
   Step-by-step Debian 13 Trixie server installation with systemd, ext4, SSH, automatic security updates, Tailscale, Docker Engine, NAS mounts, and optional NVIDIA support.
 ---

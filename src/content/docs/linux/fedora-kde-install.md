@@ -1,5 +1,5 @@
 ---
-title: "Fedora 44 KDE Plasma Desktop Installation Guide"
+title: "Fedora KDE Plasma Desktop Installation Guide"
 description: >-
   Step-by-step Fedora 44 KDE Plasma Desktop installation with Fedora's graphical installer, Btrfs defaults, RPM Fusion, AMD/NVIDIA notes, privacy cleanup, and practical post-install configuration.
 ---
