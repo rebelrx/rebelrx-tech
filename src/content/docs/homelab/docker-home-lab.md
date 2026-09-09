@@ -97,7 +97,7 @@ You do not need server-class hardware to start. A small used PC, mini PC, or spa
 
 You do not need server-class hardware to start. A small used PC, mini PC, or spare desktop with adequate RAM and storage is enough for a first Docker host.
 
-If you do not have Linux installed yet, start with the Debian server installation guide on this site, then return here after the base system is updated and reachable over SSH.
+If you do not have Linux installed yet, you can start with the [Debian server installation guide](/linux/debian-server-install/), then return here after the base system is updated and reachable over SSH.
 
 ---
 
@@ -106,6 +106,8 @@ If you do not have Linux installed yet, start with the Debian server installatio
 :::tip[ELI5]
 Follow these steps in order, verify the result, and only then move to the next part of the setup.
 :::
+
+From the Debian terminal:
 
 ```bash
 sudo apt update

@@ -88,6 +88,29 @@ If a service exists only because someone clicked through a GUI once, it is not y
 
 ---
 
+## 🚀 Clone the RebelRx Homelab Repo
+
+:::tip[ELI5]
+For reference, you can clone the entire RebelRx Homelab Repo, available at GitHub, and then follow along step-by-step.
+:::
+
+```bash
+cd ~
+git clone https://github.com/rebelrx/rebelrx-homelab.git
+```
+
+> This repo provides **real-world Compose templates** used in production, one
+> directory per stack, each with a filled-in `README.md`.
+
+Use the public repository as a template source. Review the current stack README and create your own private deployment repository at `/opt/docker/stacks/`, as described in [Git-Managed Homelab](/homelab/git-managed-homelab/). Copying a template is initial setup, not an ongoing synchronization strategy:
+
+```bash
+sudo mkdir -p /opt/docker/stacks
+sudo cp -a ~/rebelrx-homelab/stacks/npm /opt/docker/stacks/
+```
+
+---
+
 ## 📁 1. Standard Directory Layout
 
 :::tip[ELI5]
