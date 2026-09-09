@@ -8,6 +8,8 @@ This is the hardware and infrastructure I actually use every day. It is included
 
 The useful part is the pattern: everyday computers stay easy to use, persistent services live on dedicated server infrastructure, important data lives on redundant storage, less-trusted devices are segmented, DNS filtering happens at the network level, remote administration uses a private access layer, and backups exist independently of the machines being backed up.
 
+Much of my infrastructure was built prior to the AI-driven memory price surges in 2025. Current PC pricing does significantly limit the ability to invest in self-hosted hardware. Procuring used or refurbished enterprise gear can help offset costs. Also, many self-hosted apps don't have excessive compute requirements so cheaper mini PCs or old laptops/desktops can be used.
+
 > 💡 You can implement the same design with one used mini PC, one NAS, and good backups. The number of machines is not the point.
 
 ---
