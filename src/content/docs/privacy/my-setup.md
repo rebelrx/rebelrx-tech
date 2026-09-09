@@ -8,8 +8,6 @@ This is the hardware and infrastructure I actually use every day. It is included
 
 The useful part is the pattern: everyday computers stay easy to use, persistent services live on dedicated server infrastructure, important data lives on redundant storage, less-trusted devices are segmented, DNS filtering happens at the network level, remote administration uses a private access layer, and backups exist independently of the machines being backed up.
 
-Much of my infrastructure was built prior to the AI-driven memory price surges in 2025. Current PC pricing does significantly limit the ability to invest in self-hosted hardware. Procuring used or refurbished enterprise gear can help offset costs. Also, many self-hosted apps don't have excessive compute requirements so cheaper mini PCs or old laptops/desktops can be used.
-
 > 💡 You can implement the same design with one used mini PC, one NAS, and good backups. The number of machines is not the point.
 
 ---
@@ -419,13 +417,9 @@ The current setup provides:
 
 ---
 
-## 🚀 Final Thought
+## 🚀 Practical Takeaway
 
-You absolutely **do not need this much hardware to build a useful home lab**.
-
-This environment accumulated over years as my interests expanded from privacy and self-hosting into storage, home automation, networking, local AI, virtualization, and GPU computing.
-
-Just follow the **separation of responsibilities**:
+Do not copy the hardware list. Copy the **separation of responsibilities**:
 
 1. Keep important data backed up independently of the computer using it.
 2. Keep experiments away from services you rely on.
@@ -434,5 +428,3 @@ Just follow the **separation of responsibilities**:
 5. Document enough of the environment that you could rebuild it after a failure.
 
 If your needs are met by one mini PC and a NAS, that is a successful homelab. Add complexity only when a real workload requires it.
-
-> 🧠 The goal is not to own the most hardware. The goal is to build infrastructure that remains useful, understandable, and recoverable as your needs grow.

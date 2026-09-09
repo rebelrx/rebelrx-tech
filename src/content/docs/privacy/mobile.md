@@ -3,7 +3,7 @@ title: "📱 Mobile Privacy"
 description: >-
   A practical three-level ladder for mobile privacy: understand what your phone can reveal, harden the phone you already own, replace high-tracking apps, and optionally move to GrapheneOS.
 ---
-Your phone is the most personal surveillance device ever built. It knows where you sleep, where you work, who you talk to, what you search for, what you photograph, where you drive, what networks you connect to, and which apps and services you use throughout the day.
+Your phone is the most personal tracking device most people will ever own. It knows where you sleep, where you work, who you talk to, what you search for, what you photograph, where you drive, what networks you connect to, and which apps and services you use throughout the day.
 
 Unlike a desktop computer, it is usually **powered on, connected, sensor-rich, account-linked, and physically carried with you nearly 24/7**.
 
