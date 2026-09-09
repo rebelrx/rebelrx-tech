@@ -3,19 +3,336 @@ title: "📊 Homelab Monitoring & Management"
 description: >-
   A practical monitoring and management strategy for Docker hosts, storage, services, GPUs, backups, network reachability, and Home Assistant dashboards without unnecessary observability complexity.
 ---
-A homelab can become complex long before it becomes "enterprise." Multiple hosts, containers, NAS systems, GPUs, backups, reverse proxies, DNS servers, and remote-access services all introduce their own failure modes.
+**Monitoring** means checking whether your systems are reachable, healthy, and running out of resources before a small issue becomes an outage. **Management** means the tools and workflows you use to inspect or operate those systems.
 
-The goal of monitoring is not to collect the most metrics or build the busiest dashboard. It is to answer a much simpler question quickly:
+A useful homelab monitoring setup should answer a short list of practical questions: Is the host online? Is the service working? Is storage filling up? Are temperatures or memory abnormal? Did the last backup succeed? Is anything getting worse over time?
 
-> **What is broken, degraded, full, hot, slow, unreachable, or at risk and do I need to care right now?**
+:::tip[ELI5]
+Monitoring is the dashboard and alarm system for your homelab. Start with “is it up?” and “is it healthy?” before collecting hundreds of graphs you will never look at.
+:::
 
-A good monitoring system reduces uncertainty. A bad one generates noise.
+## 🪜 A Sensible Setup Order
 
-This guide describes the layered approach I use for monitoring and managing a self-hosted environment without turning the homelab itself into a full-time observability project.
+:::tip[ELI5]
+This section explains a sensible setup order in practical terms and what it changes in the homelab.
+:::
+
+1. Monitor whether important hosts are reachable.
+2. Add basic CPU, memory, disk, temperature, and network metrics.
+3. Add service/container health checks.
+4. Monitor storage pools and NAS mounts.
+5. Monitor backup success and restore readiness.
+6. Add GPU metrics only on systems that need them.
+7. Build a simple summary dashboard.
+8. Add alerts only for conditions you are willing to act on.
+
+## 🧩 Monitoring Terms You Should Know
+
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
+
+- **Metric** — a numeric measurement such as CPU load or free disk space.
+- **Healthcheck** — a test of whether an application is actually responding correctly.
+- **Alert** — a notification triggered when a meaningful condition is met.
+- **Trend** — how a metric changes over time; often more useful than one snapshot.
+- **Reachability** — whether a device or service can be contacted at all.
 
 ---
 
-## 🧭 1. Start With a Monitoring Philosophy
+## 🛠️ Build a Real Monitor First: Glances
+
+:::tip[ELI5]
+Before designing a monitoring "strategy," install one tool that shows what your server is doing right now. Glances gives you CPU, load, memory, disks, network, processes, sensors, and Docker information in one place.
+:::
+
+For a small-to-medium homelab, **Glances is the first monitor I would install on every important host**. You can run it interactively in a terminal or expose its web interface privately.
+
+### Option A — Install Glances directly on Debian
+
+```bash
+sudo apt update
+sudo apt install -y glances lm-sensors smartmontools
+```
+
+Detect hardware sensors:
+
+```bash
+sudo sensors-detect
+sensors
+```
+
+Then launch Glances:
+
+```bash
+glances
+```
+
+For the web interface:
+
+```bash
+glances -w
+```
+
+Then browse from another trusted machine to:
+
+```text
+http://<SERVER-IP>:61208
+```
+
+Do not expose the Glances web UI directly to the public internet. Keep it on your LAN/Tailscale or put authentication in front of it.
+
+### Option B — Run Glances as a Docker stack
+
+This is closer to how I run it in a Docker-heavy homelab:
+
+```yaml
+name: glances
+
+services:
+  glances:
+    image: nicolargo/glances:ubuntu-latest-full
+    container_name: glances
+    restart: unless-stopped
+    pid: host
+    network_mode: host
+    environment:
+      GLANCES_OPT: "-w"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/os-release:/etc/os-release:ro
+```
+
+Deploy it:
+
+```bash
+mkdir -p /opt/docker/stacks/glances
+cd /opt/docker/stacks/glances
+nano compose.yaml
+
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+Open:
+
+```text
+http://<SERVER-IP>:61208
+```
+
+`pid: host` lets Glances see host processes. `network_mode: host` gives it a much more useful view of the host's interfaces. The Docker socket lets it report container activity.
+
+> Mounting the Docker socket gives a container powerful visibility into Docker. Keep the mount read-only and only use trusted images.
+
+**Reference:** [Glances Docker documentation](https://glances.readthedocs.io/en/latest/docker.html)
+
+---
+
+## 📋 Build a Basic Monitoring Dashboard
+
+:::tip[ELI5]
+A useful dashboard is a short health summary, not a wall of graphs. Start with the signals that tell you whether the machine is healthy and whether you are about to run out of something.
+:::
+
+For each important host, put these on one screen:
+
+| Metric | Why it matters | What I look for |
+| :--- | :--- | :--- |
+| Reachability | Is the host online? | Unexpected offline state |
+| CPU usage/load | Is work saturating the processor? | Sustained high load, especially with poor responsiveness |
+| CPU temperature | Is cooling keeping up? | Sustained temperature near the CPU's documented thermal limit |
+| Memory | Is RAM pressure growing? | Low available RAM **plus** swap activity or OOM events |
+| Root filesystem | Can the OS still write? | >80% warrants attention; >90% is urgent on a small system disk |
+| Data filesystem | Are application volumes filling? | Growth trend and free space |
+| Docker health | Are services actually healthy? | `unhealthy`, restart loops, unexpected exits |
+| Network | Is traffic abnormal or an interface down? | Sudden errors/drops or missing expected interface |
+| Backup status | Can you recover? | No recent successful backup is an alert |
+| GPU/VRAM (AI hosts) | Is the accelerator saturated or throttling? | VRAM exhaustion, thermal/power throttling |
+
+A perfectly reasonable first dashboard is simply **Glances per host + Uptime Kuma for service reachability + your backup tool's status**. You do not need Prometheus/Grafana on day one.
+
+---
+
+## ⌨️ Debian Monitoring Commands You Should Know
+
+:::tip[ELI5]
+When a dashboard says something is wrong, these commands tell you what is actually happening on the machine.
+:::
+
+### CPU and load
+
+```bash
+uptime
+top
+```
+
+If available:
+
+```bash
+htop
+```
+
+Install it with:
+
+```bash
+sudo apt install -y htop
+```
+
+### Memory
+
+```bash
+free -h
+vmstat 1
+```
+
+### Disk space
+
+```bash
+df -hT
+```
+
+### Largest directories
+
+```bash
+sudo du -xh / --max-depth=1 2>/dev/null | sort -h
+```
+
+### Disk I/O
+
+```bash
+sudo apt install -y sysstat
+iostat -xz 1
+```
+
+### Temperatures and fans
+
+```bash
+sensors
+```
+
+Debian's `lm-sensors` package provides the `sensors` command for temperature, voltage, and fan readings.
+
+### SMART drive health
+
+```bash
+sudo smartctl -a /dev/sdX
+```
+
+For NVMe:
+
+```bash
+sudo smartctl -a /dev/nvme0
+```
+
+### Docker
+
+```bash
+docker ps
+docker stats
+docker compose ps
+docker compose logs --tail=100
+```
+
+Find unhealthy containers:
+
+```bash
+docker ps --filter health=unhealthy
+```
+
+Find recent exits:
+
+```bash
+docker ps -a --filter status=exited
+```
+
+### System errors
+
+```bash
+systemctl --failed
+journalctl -p warning..alert -b
+journalctl -k -p warning..alert -b
+```
+
+### Network sockets
+
+```bash
+ip -br addr
+ss -tulpn
+```
+
+### NVIDIA GPU hosts
+
+```bash
+nvidia-smi
+watch -n 2 nvidia-smi
+```
+
+---
+
+## 🌡️ How to Interpret the Numbers
+
+:::tip[ELI5]
+A number is only useful when you know what "normal" looks like. Learn the normal range for your hardware, then investigate sustained departures from it instead of panicking over a one-second spike.
+:::
+
+### CPU temperature
+
+There is **no universal safe temperature** for every CPU. The correct limit is the manufacturer's documented maximum junction/operating temperature for your exact processor.
+
+As a practical rule:
+
+- Idle temperatures vary widely with CPU, cooler, fan curve, and ambient room temperature.
+- Sustained load in the 70–90°C range can be completely normal on modern high-performance CPUs.
+- Temperatures **approaching the CPU's rated maximum** should make you check clocks, cooling, fan/pump operation, and throttling.
+- A reading **over 100°C is a serious warning on most desktop/server CPUs** and often means the processor is at or beyond its thermal-control range—but verify the exact CPU specification before using 100°C as a hard universal threshold.
+
+If temperature is high, check whether frequency is dropping under load. High temperature plus reduced clocks is the classic sign of thermal throttling.
+
+### CPU usage versus load average
+
+`100% CPU` is not automatically a problem. If you started a compile, transcode, backup, or inference job, high utilization means the hardware is being used.
+
+Investigate when high CPU is **unexpected**, sustained, and associated with slow services.
+
+Load average needs context: on a 16-thread machine, load `2` is light; on a 2-thread machine, load `8` is severe pressure.
+
+### Memory
+
+Linux intentionally uses free RAM for cache. Do not alert just because `free` memory is low.
+
+Watch **available memory**, swap growth, and OOM messages:
+
+```bash
+free -h
+journalctl -k | grep -i -E 'oom|out of memory'
+```
+
+### Storage
+
+I start paying attention around **80% full** and treat **90%+** as something to fix promptly, especially for the root filesystem, databases, and Docker storage.
+
+A filesystem can technically keep working above those levels, but upgrades, logs, temporary files, database maintenance, and container image pulls all need headroom.
+
+### Docker health
+
+`Up` means the container process is running. It does **not** prove the application is healthy.
+
+Prefer containers with meaningful healthchecks and verify important services from the client side as well.
+
+---
+
+## 🧠 Monitoring Architecture — After the Basics Work
+
+:::tip[ELI5]
+The sections below are the design/reference part of this guide. Build the Glances and command-line baseline first; then add layers when you have a concrete monitoring need.
+:::
+
+## 🧭 1. Decide What You Actually Need to Monitor
+
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
 
 Before installing another dashboard, decide what you actually need to know.
 
@@ -54,6 +371,10 @@ Metrics without context are just numbers.
 ---
 
 ## 🧱 2. Monitor in Layers
+
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
 
 A reliable monitoring design uses several layers rather than assuming one signal proves everything is healthy.
 
@@ -138,6 +459,10 @@ This is the layer people most commonly forget.
 
 ## 🖥️ 3. Host Reachability
 
+:::tip[ELI5]
+Simple reachability monitoring remains one of the highest-value checks in a homelab.
+:::
+
 Simple reachability monitoring remains one of the highest-value checks in a homelab.
 
 Monitor critical classes of systems such as:
@@ -181,6 +506,10 @@ For an important wired server, something on the order of a few minutes is usuall
 
 ## 📈 4. Host Metrics With Glances
 
+:::tip[ELI5]
+[Glances](https://github.com/nicolargo/glances) is a useful tool for interactive homelab monitoring because it exposes a large amount of useful host information without requiring a full metrics stack.
+:::
+
 [Glances](https://github.com/nicolargo/glances) is a useful tool for interactive homelab monitoring because it exposes a large amount of useful host information without requiring a full metrics stack.
 
 Typical metrics include:
@@ -198,6 +527,10 @@ Typical metrics include:
 ---
 
 ## 🐳 5. Docker Management Without Losing Source of Truth
+
+:::tip[ELI5]
+This section explains how the Docker part of the setup should be configured or operated.
+:::
 
 Container-management interfaces are extremely useful, especially once a server operates dozens of Compose applications.
 
@@ -245,6 +578,10 @@ Do not assume a container-management dashboard is a complete monitoring system.
 ---
 
 ## ❤️ 6. Container and Service Health
+
+:::tip[ELI5]
+Containers are replaceable application instances; this section explains how to operate them without losing persistent state.
+:::
 
 Docker's simplest status is whether a container process is running.
 
@@ -304,6 +641,10 @@ A healthcheck should validate readiness, not merely create another command that 
 
 ## 🌐 7. Monitor the Service From the Outside Too
 
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
+
 Internal healthchecks and external checks answer different questions.
 
 An internal healthcheck may prove:
@@ -330,6 +671,10 @@ This prevents a common false positive where every container looks healthy while 
 ---
 
 ## 💾 8. Storage Monitoring
+
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
 
 Storage is one of the most predictable sources of homelab outages.
 
@@ -378,6 +723,10 @@ Do not focus only on the large data arrays while ignoring `/`.
 
 ## 🩺 9. Drive and Pool Health
 
+:::tip[ELI5]
+Filesystem capacity is not the same as hardware health.
+:::
+
 Filesystem capacity is not the same as hardware health.
 
 For local disks, useful tools include:
@@ -424,6 +773,10 @@ And remember:
 
 ## 🧠 10. Memory Monitoring
 
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
+
 Linux memory reporting is frequently misunderstood.
 
 A server showing high RAM utilization is not automatically under memory pressure because Linux intentionally uses otherwise-idle memory for caches.
@@ -457,6 +810,10 @@ Conversely, a system intentionally caching tens of gigabytes may be perfectly he
 ---
 
 ## 🌡️ 11. Temperature and Cooling
+
+:::tip[ELI5]
+Temperature monitoring becomes increasingly important in dense racks and GPU-heavy systems.
+:::
 
 Temperature monitoring becomes increasingly important in dense racks and GPU-heavy systems.
 
@@ -492,6 +849,10 @@ Then alert when temperatures move materially outside that envelope or when therm
 ---
 
 ## 🎮 12. GPU Monitoring for AI Hosts
+
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
 
 GPU systems need a few additional signals because utilization, VRAM, thermals, and power behavior directly affect workload availability.
 
@@ -543,6 +904,10 @@ When diagnosing unexpectedly poor AI performance, monitor the GPU while the work
 
 ## 🤖 13. Monitor AI Workloads Differently
 
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
+
 AI infrastructure is not just another web application.
 
 Useful questions include:
@@ -574,6 +939,10 @@ where the application exposes enough information to do so.
 ---
 
 ## 🗄️ 14. NAS and Network Storage Monitoring
+
+:::tip[ELI5]
+This section covers shared network storage and what must be checked before applications depend on it.
+:::
 
 Network storage introduces another layer between applications and their data.
 
@@ -611,6 +980,10 @@ Where a service depends on remote storage, startup ordering and mount validation
 ---
 
 ## 💿 15. Backup Monitoring Is Mandatory
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
 A backup job that ran successfully six months ago is not a backup strategy.
 
@@ -659,6 +1032,10 @@ For a deeper strategy, see [Backup Architecture & Recovery](/homelab/backup-and-
 
 ## 🏠 16. Home Assistant as the Summary Dashboard
 
+:::tip[ELI5]
+If Home Assistant is already part of the household infrastructure, it can work extremely well as a **summary-level operations dashboard**.
+:::
+
 If Home Assistant is already part of the household infrastructure, it can work extremely well as a **summary-level operations dashboard**.
 
 That does not mean Home Assistant must collect every metric.
@@ -702,6 +1079,10 @@ A wall-mounted dashboard should be understandable from across the room.
 
 ## 🧰 17. Separate Summary, Management, and Diagnostics
 
+:::tip[ELI5]
+Trying to make one interface do everything usually produces a poor interface.
+:::
+
 Trying to make one interface do everything usually produces a poor interface.
 
 A more useful pattern is:
@@ -738,6 +1119,10 @@ Each layer has a different job.
 ---
 
 ## 📜 18. Logs and Journals
+
+:::tip[ELI5]
+Metrics tell you **that** something changed.
+:::
 
 Metrics tell you **that** something changed.
 
@@ -779,7 +1164,7 @@ Follow logs:
 docker compose logs -f
 ```
 
-On Devuan/sysvinit or Artix/OpenRC, use the installed logger's files (such as `/var/log/syslog` or `/var/log/messages`), `dmesg` with suitable privileges, and `service --status-all` or `rc-status`. `journalctl`, `systemctl`, and `timedatectl` examples apply only where systemd provides those services.
+On non-systemd distributions such as Artix/OpenRC, use the installed logger's files (such as `/var/log/syslog` or `/var/log/messages`), `dmesg` with suitable privileges, and `service --status-all` or `rc-status`. `journalctl`, `systemctl`, and `timedatectl` examples apply only where systemd provides those services.
 
 ### Know where logs live
 
@@ -801,6 +1186,10 @@ Enable it for troubleshooting, then disable it when finished.
 
 ## 🕐 19. Time Synchronization Matters
 
+:::tip[ELI5]
+Logs from multiple systems become much harder to correlate if the clocks disagree.
+:::
+
 Logs from multiple systems become much harder to correlate if the clocks disagree.
 
 Ensure hosts have reliable time synchronization.
@@ -816,6 +1205,10 @@ When debugging an event that crossed several systems — for example DNS, revers
 ---
 
 ## 🚨 20. Design Alerts for Humans
+
+:::tip[ELI5]
+Alerts should tell you about conditions that need action, not every harmless fluctuation.
+:::
 
 The fastest way to make monitoring useless is to generate too many notifications.
 
@@ -871,6 +1264,10 @@ Not everything deserves the same urgency.
 
 ## 🔕 21. Prevent Alert Fatigue
 
+:::tip[ELI5]
+Alerts should tell you about conditions that need action, not every harmless fluctuation.
+:::
+
 Every false or irrelevant alert trains you to ignore the next one.
 
 If an alert fires repeatedly without requiring action, change it.
@@ -888,6 +1285,10 @@ A small set of trusted alerts is far more valuable than dozens of noisy ones.
 ---
 
 ## 📊 22. Avoid Dashboard Theater
+
+:::tip[ELI5]
+A dashboard with 100 graphs can look impressive while providing very little operational value.
+:::
 
 A dashboard with 100 graphs can look impressive while providing very little operational value.
 
@@ -911,6 +1312,10 @@ If there is no good answer, it may not deserve permanent dashboard space.
 ---
 
 ## 📉 23. Trends Matter More Than Snapshots
+
+:::tip[ELI5]
+Some problems are obvious only over time.
+:::
 
 Some problems are obvious only over time.
 
@@ -938,6 +1343,10 @@ You do not necessarily need enterprise-scale time-series infrastructure to benef
 
 ## 🔄 24. Monitor Changes, Not Just Failures
 
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
+
 Many incidents begin with a change:
 
 - new container image
@@ -959,6 +1368,10 @@ This is another reason the [Git-Managed Homelab](/homelab/git-managed-homelab/) 
 
 ## 📦 25. Image and Software Update Visibility
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 Knowing that an update exists is useful. Automatically applying every update is a separate decision.
 
 For infrastructure services, prefer visibility plus deliberate upgrades over blind automation where an update could introduce migrations or breaking changes.
@@ -977,6 +1390,10 @@ Monitoring should help you discover drift, not pressure you into uncontrolled up
 ---
 
 ## 🔌 26. Reboot and Power-Loss Validation
+
+:::tip[ELI5]
+A system is not truly healthy until it can recover after a reboot.
+:::
 
 A system is not truly healthy until it can recover after a reboot.
 
@@ -1017,6 +1434,10 @@ A container showing `Up` is only one part of the test.
 
 ## 🧪 27. Test Failure Modes Deliberately
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 Monitoring should be tested just like backups.
 
 Occasionally simulate harmless failures in a controlled way:
@@ -1037,6 +1458,10 @@ Do not discover during a real outage that an alert has silently stopped working.
 ---
 
 ## 🧹 28. Routine Maintenance Review
+
+:::tip[ELI5]
+Monitoring itself needs maintenance.
+:::
 
 Monitoring itself needs maintenance.
 
@@ -1079,6 +1504,10 @@ Monitoring drift is real. A dashboard can remain beautifully green because the m
 
 ## 🔐 29. Monitoring and Privacy
 
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
+
 Monitoring data can reveal more about an environment than it first appears.
 
 Potentially sensitive data includes:
@@ -1117,6 +1546,10 @@ A polished dashboard can accidentally become a network diagram.
 
 ## 🧯 30. Troubleshooting Order
 
+:::tip[ELI5]
+Work through these checks in order so you isolate the failing layer instead of changing several things at once.
+:::
+
 When something appears broken, troubleshoot from the outside inward rather than randomly restarting containers.
 
 A useful sequence is:
@@ -1137,6 +1570,10 @@ This avoids treating every problem as a Docker problem.
 ---
 
 ## 🛠️ 31. Useful Diagnostic Commands
+
+:::tip[ELI5]
+These tools often answer more quickly than navigating through several dashboards.
+:::
 
 ### Host state
 
@@ -1228,6 +1665,10 @@ These tools often answer more quickly than navigating through several dashboards
 
 ## ✅ 32. Recommended Monitoring Baseline
 
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
+
 For a reasonably complex self-hosted environment, I recommend at least the following coverage.
 
 | Area | Minimum useful signal |
@@ -1250,6 +1691,10 @@ This is enough to catch the overwhelming majority of problems that actually matt
 
 ## 📋 33. New-System Monitoring Checklist
 
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
+
 Whenever a new machine or appliance joins the environment, ask:
 
 - [ ] Is reachability monitored?
@@ -1269,6 +1714,10 @@ A device that matters enough to depend on is usually important enough to monitor
 
 ## 🔍 34. Monitoring Review Checklist
 
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
+
 Periodically ask:
 
 - [ ] Are all current critical systems monitored?
@@ -1286,7 +1735,11 @@ If the answer to the last question is no, simplify or improve the monitoring des
 
 ---
 
-## 🎯 Final Thought
+## ✅ What to Remember
+
+:::tip[ELI5]
+This is the short version to keep in mind after you finish the page.
+:::
 
 The best homelab monitoring system is not the one with the most graphs. It is the one you trust when something goes wrong.
 

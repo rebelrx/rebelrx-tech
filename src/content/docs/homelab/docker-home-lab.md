@@ -1,21 +1,69 @@
 ---
-title: "🐳 Docker Homelab (Devuan + Compose)"
+title: "🐳 Docker Homelab (Debian + Compose)"
 description: >-
-  Build a clean, reproducible Docker Compose homelab on bare-metal Devuan — no systemd, no hypervisor overhead.
+  Build a clean, reproducible Docker Compose homelab on Debian 13 using Docker Engine and Docker Compose, with persistent data kept separate from disposable containers.
 ---
-A practical guide to running a **clean, reproducible Docker homelab** on bare metal using Devuan and Docker Compose.
+Docker lets you run applications in **containers**: lightweight, isolated packages that include an application and the pieces it needs to run. Instead of installing every service directly into Linux and hoping their dependencies do not collide, you can describe each service in a small configuration file and start or replace it consistently.
 
-Most homelab guides assume Debian, Ubuntu, or some other systemd distro. This one goes the other way: **Devuan**, Debian *without* systemd, for a leaner, init-simple base you fully control. The Compose stacks come from the [RebelRx homelab repo](https://github.com/rebelrx/rebelrx-homelab) and run the same on any Docker host; here we set them up the Devuan way.
+If you already understand virtual machines, think of containers as the lighter-weight cousin. A VM includes an entire guest operating system; a Docker container shares the host's Linux kernel and isolates the application itself. That makes containers fast to start, easy to replace, and especially convenient for self-hosted services.
+
+This guide takes you from a fresh Linux host to a working Docker homelab. By the end, you will understand the basic terms, install Docker and Docker Compose, create a clean directory structure, start a first stack, update it, and troubleshoot the most common problems.
+
+:::tip[ELI5]
+Docker is a standardized way to run apps without manually installing every app into the operating system. You describe what you want, Docker starts it, and if a container breaks you replace the container while keeping the important data separately.
+:::
+
+## 🧩 Docker Terms You Should Know First
+
+:::tip[ELI5]
+This section explains how the Docker part of the setup should be configured or operated.
+:::
+
+- **Image** — the packaged application template Docker downloads.
+- **Container** — a running instance of an image.
+- **Volume / bind mount** — storage that lives outside the disposable container so your data survives upgrades and replacement.
+- **Port** — the network doorway used to reach an application, such as `8080`.
+- **Docker Compose** — a YAML file that describes one or more containers and how they should run together.
+- **Stack** — the practical unit you operate together: an app and any database, cache, worker, or supporting services it needs.
+
+A simple mental model is:
+
+```text
+compose.yaml
+    ↓
+Docker pulls images
+    ↓
+Docker creates containers
+    ↓
+Containers use persistent data + network ports
+```
+
+## 🪜 What You Will Build
+
+:::tip[ELI5]
+This section explains what you will build in practical terms and what it changes in the homelab.
+:::
+
+1. Install Docker Engine and the Compose plugin.
+2. Give your normal user permission to operate Docker.
+3. Create separate directories for stack definitions and persistent data.
+4. Start one Compose stack.
+5. Verify that it works.
+6. Learn the normal update, stop, start, and troubleshooting workflow.
 
 ---
 
-## 🔥 Why Docker (Not Proxmox)
+## 🔥 Why Docker Works Well for a Homelab
+
+:::tip[ELI5]
+This section explains how the Docker part of the setup should be configured or operated.
+:::
 
 You *can* use Proxmox. Many people do.
 
 For this Docker host, I prefer bare metal because it reduces the number of layers to maintain. A dedicated hypervisor remains useful for OS testing, snapshots, and stronger workload isolation—as in [my setup](/privacy/my-setup/).
 
-### ❌ Proxmox Challenges
+### When a VM Platform Adds More Than You Need
 
 - VM overhead (CPU + RAM waste)
 - More layers to debug
@@ -25,7 +73,7 @@ For this Docker host, I prefer bare metal because it reduces the number of layer
 
 ---
 
-### ✅ Why Prefer Docker Bare Metal
+### Why I Prefer Docker on a Dedicated Linux Host
 
 - **Lightweight** → no virtualization overhead  
 - **Simple** → one OS, one system to manage  
@@ -39,17 +87,25 @@ For this Docker host, I prefer bare metal because it reduces the number of layer
 
 ## ⚙️ Requirements
 
+:::tip[ELI5]
+You do not need server-class hardware to start. A small used PC, mini PC, or spare desktop with adequate RAM and storage is enough for a first Docker host. If you do not have Linux installed yet.
+:::
+
 - PC or Laptop
 - Internet access
-- Linux OS installed (in this guide, Devuan)
+- Debian 13 or another currently supported Debian release
 
-If you don't have a dedicated PC, you can purchase one of these inexpensive mini PC boxes that includes RAM and SSD to get started right away: [Beelink Mini S12](https://www.amazon.com/dp/B0BW8JSQCH)
+You do not need server-class hardware to start. A small used PC, mini PC, or spare desktop with adequate RAM and storage is enough for a first Docker host.
 
-If you don't have Linux installed, see the [Devuan Linux Server Install Guide](/linux/devuan-server-install/)
+If you do not have Linux installed yet, start with the Debian server installation guide on this site, then return here after the base system is updated and reachable over SSH.
 
 ---
 
 ## 📦 Install Dependencies
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
 
 ```bash
 sudo apt update
@@ -58,33 +114,44 @@ sudo apt install -y ca-certificates curl gnupg git
 
 ---
 
-## 🔑 Add Docker Repository
+## 🔑 Add Docker's Official Repository
 
-Docker's `.deb` repository is keyed by **Debian** codename — but Devuan ships
-its own (`daedalus`, `excalibur`, …), which Docker's repo won't recognize. Map
-it to the Debian base your Devuan release is built on.
+:::tip[ELI5]
+This tells Debian where to download the official Docker packages and how to verify that they are signed by Docker.
+:::
+
+Docker officially supports Debian 13 (Trixie). Use Docker's own APT repository rather than an unrelated distribution package so the Engine, CLI, Buildx, and Compose plugin are maintained together.
 
 ```bash
+sudo apt update
+sudo apt install -y ca-certificates curl
+
 sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg \
+  -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
 
-curl -fsSL https://download.docker.com/linux/debian/gpg | \
-  sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/debian
+Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
 
-# Devuan ships its own codename; Docker's Debian repo needs the Debian base:
-#   Devuan 5  "Daedalus"  → bookworm
-#   Devuan 6  "Excalibur" → trixie
-DEBIAN_CODENAME=trixie   # set to match your Devuan release's Debian base
-
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/debian \
-  $DEBIAN_CODENAME stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
 ```
 
----
+:::note
+If you are adapting this guide to a Debian derivative, confirm the corresponding Debian codename before using the repository. On Debian 13 itself, `VERSION_CODENAME` should resolve to `trixie`.
+:::
 
 ## 🐳 Install Docker + Compose
+
+:::tip[ELI5]
+This section explains the saved configuration Docker uses to recreate the stack consistently.
+:::
 
 ```bash
 sudo apt update
@@ -99,23 +166,34 @@ sudo apt install -y \
 
 ---
 
-## 🚀 Enable + Start Docker (SysVinit)
+## 🚀 Verify Docker Is Running
+
+:::tip[ELI5]
+This section explains how the Docker part of the setup should be configured or operated.
+:::
+
+Docker normally starts automatically after installation on Debian. Confirm the service and CLI are available:
 
 ```bash
-sudo service docker start
-sudo update-rc.d docker defaults
-```
-
-Verify:
-
-```bash
+sudo systemctl status docker --no-pager
 docker --version
 docker compose version
 ```
 
+If the service is not running:
+
+```bash
+sudo systemctl enable --now docker
+```
+
+
 ---
 
 ## 🔐 Add User to Docker Group
+
+:::tip[ELI5]
+This section explains how the Docker part of the setup should be configured or operated.
+:::
 
 ```bash
 sudo usermod -aG docker $USER
@@ -133,6 +211,10 @@ docker run hello-world
 ---
 
 ## 📁 Directory Structure
+
+:::tip[ELI5]
+This section is about where files should live so you can find, back up, and rebuild them consistently.
+:::
 
 Keep **config and data in separate trees** — this is the single most important
 layout decision, and every stack in the repo follows it:
@@ -172,6 +254,10 @@ Example:
 
 ## 🚀 Clone the RebelRx Homelab Repo
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 ```bash
 cd ~
 git clone https://github.com/rebelrx/rebelrx-homelab.git
@@ -190,6 +276,10 @@ sudo cp -a ~/rebelrx-homelab/stacks/npm /opt/docker/stacks/
 ---
 
 ## 📦 Template Structure
+
+:::tip[ELI5]
+Some stacks ship extra files (e.g.
+:::
 
 Inside the repo:
 
@@ -213,6 +303,10 @@ Some stacks ship extra files (e.g. `paperless` has a `docker-compose.env.example
 ---
 
 ## 🧠 Key Concepts (Read This First)
+
+:::tip[ELI5]
+Everything is defined in YAML.
+:::
 
 ### 1. Compose-First Mindset
 
@@ -281,6 +375,10 @@ ports:
 
 ## 🌐 Reverse Proxy (Nginx Proxy Manager)
 
+:::tip[ELI5]
+This section explains how one front-end service can route friendly web names to the correct internal application.
+:::
+
 Recommended approach — the `npm` stack in the repo:
 
 - Run **Nginx Proxy Manager (NPM)**
@@ -307,6 +405,10 @@ Benefits:
 
 ## ▶️ Running Your First Stack
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 Start with the reverse proxy so everything else has something to sit behind:
 
 ```bash
@@ -327,6 +429,10 @@ docker compose up -d
 
 ## 🔄 Updating Containers
 
+:::tip[ELI5]
+Containers are replaceable application instances; this section explains how to operate them without losing persistent state.
+:::
+
 Read release notes, confirm a current application-consistent backup, and record the old image version before updating. Validate the application afterward. See [Docker Infrastructure Standards](/homelab/docker-infrastructure-standards/).
 
 ```bash
@@ -336,12 +442,20 @@ docker compose up -d
 
 ## 🔄 Stopping and Starting Containers
 
+:::tip[ELI5]
+Containers are replaceable application instances; this section explains how to operate them without losing persistent state.
+:::
+
 ```bash
 docker compose down
 docker compose up -d
 ```
 
 ## 🔄 Re-starting Containers
+
+:::tip[ELI5]
+Containers are replaceable application instances; this section explains how to operate them without losing persistent state.
+:::
 
 ```bash
 docker compose restart [service_name]
@@ -353,6 +467,10 @@ docker compose restart [service_name]
 
 ## 🧼 Cleanup
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 Inspect resource usage first with `docker system df`. The following removes unused images, stopped containers, networks, and build cache; it can remove rollback images. Use it only after successful validation and after deciding what recovery artifacts to retain:
 
 ```bash
@@ -362,6 +480,10 @@ docker system prune -a
 ---
 
 ## ⚠️ Common Pitfalls
+
+:::tip[ELI5]
+These are recurring mistakes worth checking before assuming the underlying tool is broken.
+:::
 
 ### ❌ Permission Issues
 
@@ -400,7 +522,11 @@ Edit the **Compose file**, then redeploy.
 
 ---
 
-## 🧠 Final Thoughts
+## ✅ What to Remembers
+
+:::tip[ELI5]
+This is the short version to keep in mind after you finish the page.
+:::
 
 This setup is built around a few principles:
 
@@ -415,6 +541,10 @@ Just Docker + Compose + discipline.
 
 ## 🔗 Suggested Next Steps
 
+:::tip[ELI5]
+This section explains suggested next steps in practical terms and what it changes in the homelab.
+:::
+
 - Add more stacks from the RebelRx repo
 - Set up the reverse proxy with the `npm` stack (Nginx Proxy Manager)
 - Implement backups with the `backup` stack (Kopia)
@@ -424,6 +554,10 @@ Just Docker + Compose + discipline.
 ---
 
 ## ⚠️ Disclaimer
+
+:::tip[ELI5]
+Here, you is for educational purposes.
+:::
 
 This guide is for educational purposes.
 

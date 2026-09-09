@@ -1,21 +1,68 @@
 ---
-title: "🗂️ Mounting NAS Storage (Devuan)"
+title: "🗂️ Mounting NAS Storage on Linux"
 description: >-
-  Mount NAS storage on a Devuan server the right way — NFS vs SMB, fstab entries that survive reboots without systemd, Docker ordering gotchas, and the SQLite-over-NFS mistake that corrupts homelab databases.
+  Mount NAS storage on a Linux server safely: understand NFS vs SMB, test shares before making them permanent, configure `/etc/fstab`, verify boot behavior, and keep network storage failures from breaking Docker applications.
 ---
-Your Network Area Storage (NAS) device holds the bulk storage; your server runs the services. This guide connects them **reliably**: mounts that survive reboots, behave under sysvinit, and don't silently feed empty directories to your Docker containers.
+A **NAS (Network Attached Storage)** is a computer or appliance whose main job is to provide storage to other devices over the network. Instead of every server keeping all of its files on local disks, a NAS can provide shared media, backups, documents, datasets, or application storage from one central system.
 
-This guide uses Devuan as the OS since there aren't many guides available, but the same concepts can be applied to any other Linux distro.
+NAS describes the job, not the physical shape. Common forms include:
+
+- **Desktop NAS** — a small tower or multi-bay appliance designed to sit on a desk or shelf.
+- **Rack-mounted NAS** — a rack chassis designed for a server rack, usually with more drive bays, networking, and expansion options.
+- **DIY NAS** — a standard PC or server running storage-focused software such as TrueNAS, Unraid, or a general Linux/BSD system.
+- **NASbook / all-flash NAS** — a compact, high-speed system using SSDs or NVMe rather than large hard drives.
+
+Once the NAS is sharing a folder, your Linux server still needs to **mount** that share. Mounting makes a remote folder appear at a normal local path so applications and Docker containers can use it.
+
+:::tip[ELI5]
+A NAS is a shared hard drive box on your network. Mounting is the step that makes one of its shared folders show up on your Linux server as if it were a local folder.
+:::
+
+## 🧩 Terms You Should Know First
+
+:::tip[ELI5]
+This section explains terms you should know first in practical terms and what it changes in the homelab.
+:::
+
+- **Share / export** — a folder the NAS makes available over the network.
+- **Mount point** — the local directory where that remote share appears.
+- **NFS** — a network file-sharing protocol commonly used between Linux/Unix systems.
+- **SMB** — the file-sharing protocol commonly associated with Windows and widely supported by NAS appliances.
+- **`/etc/fstab`** — the Linux configuration file used to define filesystems that should mount automatically.
+- **UID/GID** — numeric Linux user/group identities that often determine whether a container can read or write mounted files.
+
+## 🪜 What You Will Do
+
+:::tip[ELI5]
+This section explains what you will do in practical terms and what it changes in the homelab.
+:::
+
+1. Create or verify a share on the NAS.
+2. Choose NFS or SMB.
+3. Install the matching Linux client tools.
+4. Test the mount manually first.
+5. Verify read and write access.
+6. Add a permanent `/etc/fstab` entry.
+7. Reboot and confirm it returns correctly.
+8. Only then pass the mounted path into Docker.
 
 ---
 
-## ⚠️ Core Principle
+## ✅ What You Need to Know First
 
-> Storage should be boring. A mount you have to think about is a mount that will fail you.
+:::tip[ELI5]
+This section explains what you need to know first in practical terms and what it changes in the homelab.
+:::
+
+Reliable storage should be predictable: the same share should mount at the same place, with the same permissions, after every reboot.
 
 ---
 
-## 🧭 NFS or SMB?
+## 🧭 1. Choose NFS or SMB
+
+:::tip[ELI5]
+NFS is a common Linux-to-Linux network file-sharing protocol; this section shows where it fits and how to use it safely.
+:::
 
 Both work. Pick based on what's talking to what:
 
@@ -31,7 +78,11 @@ This guide covers both, but NFS as the primary path.
 
 ---
 
-## 🖥️ NAS-Side Prep
+## 🖥️ 2. Prepare the Share on the NAS
+
+:::tip[ELI5]
+This section covers shared network storage and what must be checked before applications depend on it.
+:::
 
 On the NAS (e.g., QNAP, Synology, TrueNAS) the UI may differ, but the concepts don't:
 
@@ -49,7 +100,11 @@ disturbing the others. Resist the single giant `share-of-everything`.
 :::
 ---
 
-## 📦 Install Client Packages (Devuan)
+## 📦 3. Install the Linux Client Packages (Debian)
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
 
 ```bash
 # NFS
@@ -62,7 +117,11 @@ sudo apt install -y cifs-utils
 
 ---
 
-## 🧪 Test Mount First (Always)
+## 🧪 4. Test the Mount Manually First
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
 
 Don't go straight to `fstab`. Prove the mount works interactively:
 
@@ -89,7 +148,11 @@ sudo umount /mnt/nas/media
 
 ---
 
-## 📌 Permanent Mounts via /etc/fstab
+## 📌 5. Make the Mount Persistent with `/etc/fstab`
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
 
 ### NFS
 
@@ -108,7 +171,7 @@ What each option buys you:
 
 - `hard` → if the NAS drops, I/O **waits** for it to return instead of silently returning errors and corrupting writes. Correct for data you care about.
 - `vers=4.1` → pin the protocol version; no negotiation surprises after NAS firmware updates
-- `_netdev` → tells the init scripts this needs networking first — **essential on sysvinit**
+- `_netdev` → marks the filesystem as network-dependent so the init system handles it as a network mount
 - `nofail` → a failed mount is not treated as a required filesystem; this is not a guarantee of bounded mount time, especially across different init scripts
 
 Apply and verify:
@@ -145,31 +208,51 @@ The `uid=1000,gid=1000` maps every file to your user — set it to match the `PU
 
 ---
 
-## 🔁 Boot Behavior Without systemd
+## 🔁 6. Verify Boot Behavior
 
-On Devuan, the sysvinit boot sequence handles this correctly **because of `_netdev`**: the `mountnfs` stage runs after networking is up and mounts everything fstab marks as network-dependent. This orders mount attempts, but does not prove the NAS is reachable or prevent Docker from starting after a failed mount. Test both online and offline NAS boots.
+:::tip[ELI5]
+A manual mount proves the share works now. This step proves the server can come back from a reboot without hanging or starting NAS-dependent applications against an empty local directory.
+:::
 
-Verify after your next reboot:
+On Debian 13, `/etc/fstab` network mounts are managed by systemd. After editing `fstab`, reload systemd's generated mount units and test the entry before rebooting:
 
 ```bash
-df -h | grep nas
+sudo systemctl daemon-reload
+sudo mount -a
+findmnt -t nfs,nfs4,cifs
 ```
 
-:::tip[On-demand mounting with autofs (optional)]
-If the NAS is sometimes off, `autofs` mounts shares only when accessed
-and releases them after idle — no boot dependency at all:
+Then reboot once while the NAS is online and confirm the share returns:
 
-```
-sudo apt install -y autofs
+```bash
+sudo reboot
 ```
 
-Then map your shares in `/etc/auto.master.d/`. For an always-on NAS,
-plain fstab is simpler and better; reach for autofs only when the NAS
-is genuinely intermittent.
+After reconnecting:
+
+```bash
+findmnt /path/to/mount
+```
+
+If you use `nofail`, also test what happens when the NAS is unavailable. `nofail` allows the host to continue booting; it does **not** guarantee that Docker services will wait for the share to appear later.
+
+For especially important mounts, systemd automounting can make boot behavior more forgiving:
+
+```text
+x-systemd.automount,_netdev,nofail
+```
+
+Use it deliberately and test the application behavior. An automount can improve availability, but it does not make a remote filesystem appropriate for every database or workload.
+
+:::note[Non-systemd Linux]
+The same NFS/SMB and `fstab` concepts apply on sysvinit/OpenRC systems, but boot ordering is init-specific. Use that distribution's network-mount/service mechanism rather than copying systemd dependency directives verbatim.
 :::
----
 
-## 🐳 The Docker Gotcha
+## 🐳 7. Pass the Mounted Storage to Docker
+
+:::tip[ELI5]
+This section explains how the Docker part of the setup should be configured or operated.
+:::
 
 This is the failure mode that bites everyone once:
 
@@ -177,7 +260,7 @@ This is the failure mode that bites everyone once:
 
 Defenses, in order of value:
 
-**1. Let the boot order do its job.** On sysvinit, `mountnfs` runs before the Docker init script — with `_netdev` set, an *online* NAS is mounted before containers start. The risk is the NAS being slow or offline (which `nofail` deliberately allows).
+**1. Verify the mount before starting the dependent stack.** On Debian/systemd, `_netdev` marks the filesystem as network-dependent, but `nofail` can still allow the host and Docker to continue when the NAS is absent. Treat the mount as an explicit dependency for any stack that would behave badly against an empty directory.
 
 **2. Make startup fail closed for dependent stacks.** A delay script that eventually exits successfully does not guard anything. Keep unrelated local-only services running, but start a NAS-dependent stack only after checking the expected mounted filesystem:
 
@@ -193,15 +276,19 @@ docker compose up -d
 
 Create the marker on the verified remote share first. Check the expected export/source as well when different shares could use the same mount point.
 
-**3. Account for automatic restarts.** A wrapper around `compose up` cannot guard containers that Docker restarts on its own. For NAS-dependent services, either disable Docker auto-start and use a mount-aware service supervisor, or implement and test a host-specific dependency arrangement that blocks their startup when storage is absent. On systemd use appropriate mount dependencies; on sysvinit/OpenRC use the matching service mechanism. Do not copy systemd units onto Devuan.
+**3. Account for automatic container restarts.** A wrapper around `docker compose up` cannot guard a container that Docker restarts on its own. For a stack that must never start without the NAS, manage that stack with a systemd unit that depends on the required mount, or use another tested mount-aware startup mechanism. Do not assume `restart: unless-stopped` understands remote-storage dependencies.
 
 A marker-file read can itself block on an unavailable hard mount. It is an identity check, not a bounded health probe.
 
-> The marker-file trick costs nothing and has saved more homelab data than any other three lines in this guide.
+A marker file is a simple identity check that helps distinguish the intended mounted share from an empty local mount-point directory.
 
 ---
 
 ## 🚫 What Not To Do
+
+:::tip[ELI5]
+The Arr stack (Sonarr, Radarr, Prowlarr…), Jellyfin, and many homelab apps use **SQLite**, which depends on file locking that network filesystems implement unreliably.
+:::
 
 :::danger[Never run SQLite databases over NFS or SMB]
 The Arr stack (Sonarr, Radarr, Prowlarr…), Jellyfin, and many homelab
@@ -220,7 +307,11 @@ The rule from the [Docker guide](/homelab/docker-home-lab/) already handles this
 
 ---
 
-## 🧰 Troubleshooting
+## 🧰 8. Troubleshooting
+
+:::tip[ELI5]
+Work through these checks in order so you isolate the failing layer instead of changing several things at once.
+:::
 
 - **`access denied by server`** → the NFS rule on the NAS doesn't include your server's IP, or the export path is wrong. Re-check with `showmount -e <nas-ip>`.
 - **Files owned by `nobody:nogroup`** → NFSv4 ID mapping mismatch. Simplest fix on a home LAN: make the UID/GID on the NAS share match your server user (1000:1000), or set the share's squash option to map all access to that UID.
@@ -230,10 +321,10 @@ The rule from the [Docker guide](/homelab/docker-home-lab/) already handles this
 
 ---
 
-## 🧠 Final Thought
+## ✅ What to Remember
 
-A NAS you can't reliably reach is just a very expensive space heater.
+:::tip[ELI5]
+This is the short version to keep in mind after you finish the page.
+:::
 
-Get the mounts boring, tested, pinned, ordered, guarded, and the rest of the homelab gets to build on storage it never has to think about.
-
-> Boring storage is the foundation everything else stands on.
+Test the share manually, make it persistent, verify a reboot, and then test the failure case with the NAS unavailable. Only after those checks should an application depend on the mount.

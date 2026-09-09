@@ -3,22 +3,52 @@ title: "🌿 Git-Managed Homelab"
 description: >-
   Use Git and Forgejo to manage homelab infrastructure safely: repository design, pre-commit validation, secrets, branches, deployment, rollback, documentation, and recovery.
 ---
+**Git** is a version-control system: it records changes to text files over time so you can see what changed, revert mistakes, review work before applying it, and keep a reproducible copy of your infrastructure definitions.
 
-A homelab becomes much easier to maintain when its configuration has **history**.
+For a homelab, Git is especially useful for Docker Compose files, README documentation, scripts, safe configuration templates, and `.env.example` files. It is **not** a backup for databases, application uploads, secrets, or other live runtime data.
 
-Without Git, a working Docker host can slowly turn into a collection of files that are difficult to explain, reproduce, or safely change. With Git, every meaningful infrastructure change can be inspected, documented, compared, and—when appropriate—reversed.
+:::tip[ELI5]
+Git is a detailed change history for your homelab's instructions. If Docker Compose describes how to build a stack, Git keeps every reviewed version of those instructions so you can recover or compare them later.
+:::
 
-The goal here is **not** to build a miniature enterprise GitOps platform.
+## 🪜 The Basic Workflow
 
-It is much simpler:
+:::tip[ELI5]
+The rest of this guide expands that workflow into a maintainable standard for a real homelab.
+:::
 
-> **Every meaningful configuration change should be reviewable, reproducible, and recoverable.**
+1. Keep stack definitions and documentation in a Git repository.
+2. Keep real secrets and runtime data out of the repository.
+3. Make a small change.
+4. Review it with `git diff`.
+5. Validate the configuration.
+6. Commit with a useful message.
+7. Push to your Git server.
+8. Deploy the reviewed configuration.
 
-This guide describes the workflow I use for infrastructure repositories in a self-hosted homelab. It complements the [Docker Infrastructure Standards](/homelab/docker-infrastructure-standards/) guide, which covers how individual stacks should be structured.
+The rest of this guide expands that workflow into a maintainable standard for a real homelab.
+
+## 🧩 Git Terms You Should Know
+
+:::tip[ELI5]
+This section explains how version control helps you review, reproduce, or recover infrastructure configuration.
+:::
+
+- **Repository (repo)** — a folder whose history Git tracks.
+- **Commit** — a saved, named checkpoint in that history.
+- **Branch** — a line of development; many homelabs simply use `main` for reviewed infrastructure.
+- **Remote** — another copy of the repository, such as Forgejo or GitHub.
+- **Push / pull** — send commits to or retrieve commits from the remote.
+- **`.gitignore`** — rules telling Git which local files should never be tracked.
+- **Diff** — the exact lines added, removed, or changed.
 
 ---
 
-## 🧭 Core Philosophy
+## ✅ What You Need to Know First
+
+:::tip[ELI5]
+Git should make the homelab **safer**, not more bureaucratic.
+:::
 
 Git should make the homelab **safer**, not more bureaucratic.
 
@@ -44,7 +74,286 @@ That small amount of discipline prevents a surprising number of problems.
 
 ---
 
+## 🌐 Choose Where Your Git Repositories Live
+
+:::tip[ELI5]
+Git is the version-control engine. GitHub, GitLab, Forgejo, and Gitea are places that store Git repositories and add a web interface, accounts, issues, pull requests, automation, and collaboration features.
+:::
+
+You have two basic choices: **use a hosted provider** or **run your own Git server**.
+
+| Option | Examples | Advantages | Drawbacks |
+| :--- | :--- | :--- | :--- |
+| Hosted Git | GitHub, GitLab.com | Almost no maintenance, excellent availability, mature CI/CD ecosystems, easy collaboration | Your infrastructure definitions live with a third party; private-feature limits and pricing can change |
+| Self-hosted Git | Forgejo, Gitea, self-managed GitLab | Full control, private by default, integrates naturally with a homelab, no dependency on a SaaS account for daily use | You own updates, backups, security, uptime, and disaster recovery |
+
+### GitHub
+
+Best default for public/open-source work and broad collaboration. It has the largest ecosystem and excellent Actions integration. For a private homelab repository, it is also perfectly reasonable if you do not want to maintain a Git service.
+
+### GitLab
+
+A very complete DevOps platform with strong built-in CI/CD. It is excellent when you want an integrated platform, but self-hosted GitLab is much heavier than Forgejo or Gitea for a typical homelab.
+
+### Gitea
+
+A lightweight self-hosted Git forge with a long history and large user base. It remains a solid option.
+
+### Forgejo
+
+Forgejo is my preferred self-hosted Git platform for a homelab. It is lightweight, open source, easy to run in Docker, and supports Actions-style CI/CD through Forgejo Runner.
+
+---
+
+## 🏠 Self-Host Forgejo with Docker Compose
+
+:::tip[ELI5]
+Forgejo gives you your own private "GitHub-like" server. Your browser talks to Forgejo, your computers clone/push repositories to it, PostgreSQL stores Forgejo's application database, and an optional runner can execute CI/CD jobs.
+:::
+
+A practical layout is:
+
+```text
+Browser / Git clients
+        │
+        ▼
+     Forgejo
+        │
+        ├── PostgreSQL database
+        │
+        └── optional Forgejo Runner → CI/CD jobs
+```
+
+The official Forgejo project publishes Docker images and documents Docker Compose installation. The current major release line is Forgejo 16.
+
+### Step 1 — Create directories
+
+```bash
+sudo mkdir -p /opt/docker/stacks/forgejo
+sudo mkdir -p /opt/docker/data/forgejo/{app,postgres}
+cd /opt/docker/stacks/forgejo
+```
+
+### Step 2 — Create `.env`
+
+```bash
+nano .env
+```
+
+Example:
+
+```dotenv
+TZ=America/New_York
+FORGEJO_DB=forgejo
+FORGEJO_DB_USER=forgejo
+FORGEJO_DB_PASSWORD=CHANGE-ME
+FORGEJO_ROOT_URL=https://git.home.example.net/
+```
+
+Generate a strong database password, for example:
+
+```bash
+openssl rand -hex 32
+```
+
+Keep `.env` out of Git.
+
+### Step 3 — Create `compose.yaml`
+
+```yaml
+name: forgejo
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: forgejo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${FORGEJO_DB}
+      POSTGRES_USER: ${FORGEJO_DB_USER}
+      POSTGRES_PASSWORD: ${FORGEJO_DB_PASSWORD}
+    volumes:
+      - /opt/docker/data/forgejo/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${FORGEJO_DB_USER} -d ${FORGEJO_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  forgejo:
+    image: data.forgejo.org/forgejo/forgejo:16
+    container_name: forgejo
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      USER_UID: 1000
+      USER_GID: 1000
+      FORGEJO__database__DB_TYPE: postgres
+      FORGEJO__database__HOST: db:5432
+      FORGEJO__database__NAME: ${FORGEJO_DB}
+      FORGEJO__database__USER: ${FORGEJO_DB_USER}
+      FORGEJO__database__PASSWD: ${FORGEJO_DB_PASSWORD}
+      FORGEJO__server__ROOT_URL: ${FORGEJO_ROOT_URL}
+    volumes:
+      - /opt/docker/data/forgejo/app:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "3000:3000"
+      - "2222:22"
+```
+
+This intentionally keeps the example understandable. In a mature homelab I would normally put the web interface behind Nginx Proxy Manager and avoid publishing more ports than necessary.
+
+### Step 4 — Start Forgejo
+
+```bash
+docker compose config
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+Open:
+
+```text
+http://<SERVER-IP>:3000
+```
+
+Complete the web installer and confirm it connects to PostgreSQL.
+
+### Step 5 — Create your first repository
+
+In Forgejo:
+
+1. Click **New Repository**.
+2. Give it a name such as `homelab-stacks`.
+3. Make it **Private**.
+4. Do not initialize it with a README if you already have an existing local repository to push.
+
+From the machine that already contains your stack files:
+
+```bash
+cd /opt/docker/stacks
+git init
+git add .
+git commit -m "Initial homelab configuration"
+git branch -M main
+git remote add origin https://git.home.example.net/your-user/homelab-stacks.git
+git push -u origin main
+```
+
+Before that first `git add .`, make sure `.gitignore` excludes `.env`, credentials, database files, application data, SSH keys, and other secrets. This guide covers that in detail below.
+
+**Reference:** [Forgejo Docker installation](https://forgejo.org/docs/latest/admin/installation/docker/)
+
+---
+
+## 🚀 What CI/CD Actually Means
+
+:::tip[ELI5]
+CI/CD is automation that runs because your repository changed. Instead of trusting yourself to remember every validation and deployment step, the Git server can run those steps for you.
+:::
+
+**CI** means **Continuous Integration**. When you push a change, automation can check it before you deploy it.
+
+Homelab CI examples:
+
+```text
+Push compose.yaml
+      ↓
+Check YAML syntax
+      ↓
+Run docker compose config
+      ↓
+Scan for accidentally committed secrets
+      ↓
+Report pass/fail
+```
+
+**CD** usually means **Continuous Delivery** or **Continuous Deployment**.
+
+- **Continuous Delivery:** automation prepares and validates a deployable change, but you choose when to deploy it.
+- **Continuous Deployment:** a successful change is automatically deployed.
+
+For a homelab, I strongly prefer **CI first** and cautious CD later. Automatically restarting infrastructure every time you edit a README is not sophistication—it is unnecessary risk.
+
+### Forgejo Actions and Runner
+
+Forgejo can run Actions-style workflows, but the jobs execute on a separate **runner**. The runner is an agent that asks Forgejo for jobs, executes their commands, and reports the result.
+
+A simple validation workflow could live at:
+
+```text
+.forgejo/workflows/validate.yaml
+```
+
+Example:
+
+```yaml
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check YAML
+        run: |
+          python - <<'PY'
+          import pathlib, yaml
+          for f in pathlib.Path('.').rglob('*.yaml'):
+              yaml.safe_load(f.read_text())
+              print(f'OK: {f}')
+          PY
+```
+
+Treat runner security seriously. A CI runner executes repository-supplied code. Do not give an internet-facing or multi-user repository runner unrestricted access to your production Docker socket unless you fully understand the consequences.
+
+---
+
+## 🪜 A Practical Git Workflow Before the Rules
+
+:::tip[ELI5]
+Get comfortable with this six-command loop before worrying about advanced branching models or CI/CD.
+:::
+
+```bash
+git status
+git diff
+git add <files-you-intend-to-change>
+git diff --staged
+git commit -m "Describe the change"
+git push
+```
+
+On another host:
+
+```bash
+git pull --ff-only
+```
+
+That is the core workflow. Most of the rest of this guide exists to make those few commands safer as the homelab grows.
+
+---
+
+## 📚 Repository Standards and Advanced Workflow
+
+:::tip[ELI5]
+The sections below turn the basic workflow into a repeatable operating standard. They matter, but you do not need to memorize them before creating your first repository.
+:::
+
 ## 📦 1. What Belongs in Git
+
+:::tip[ELI5]
+This section explains how version control helps you review, reproduce, or recover infrastructure configuration.
+:::
 
 Git is ideal for **configuration and documentation**.
 
@@ -91,6 +400,10 @@ The important distinction is that Git tracks the **instructions needed to recrea
 
 ## 🚫 2. What Does Not Belong in Git
 
+:::tip[ELI5]
+This section explains how version control helps you review, reproduce, or recover infrastructure configuration.
+:::
+
 Do not use Git as a dumping ground for runtime data.
 
 Examples that normally **should not** be committed include:
@@ -125,6 +438,10 @@ A useful mental model is:
 
 ## 🗂️ 3. Choose Repository Boundaries Deliberately
 
+:::tip[ELI5]
+This section helps you make this choice using practical criteria rather than adding complexity by default.
+:::
+
 There is no universal correct repository layout.
 
 For a homelab with multiple physical hosts, I prefer repository boundaries that reflect **operational ownership** rather than trying to place the entire environment into one giant repository.
@@ -152,6 +469,10 @@ A monorepo can work, especially for small labs, but it becomes less attractive w
 ---
 
 ## 🏠 4. Let the Repository Mirror the Real Stack Tree
+
+:::tip[ELI5]
+Where practical, I prefer the checked-out repository to **be** the active stack directory rather than maintaining a second template directory that must be copied into place.
+:::
 
 Where practical, I prefer the checked-out repository to **be** the active stack directory rather than maintaining a second template directory that must be copied into place.
 
@@ -191,6 +512,10 @@ If the repository itself is the deployed stack tree, `git status` immediately te
 
 ## 🏛️ 5. Use Forgejo as the Repository Hub
 
+:::tip[ELI5]
+A self-hosted Git service such as **Forgejo** is an excellent fit for a homelab.
+:::
+
 A self-hosted Git service such as **Forgejo** is an excellent fit for a homelab.
 
 It provides:
@@ -218,6 +543,10 @@ Fortunately, Git's distributed design helps: every normal clone already contains
 ---
 
 ## 🔐 6. Keep Repositories Private by Default
+
+:::tip[ELI5]
+Infrastructure repositories frequently reveal more than people expect.
+:::
 
 Infrastructure repositories frequently reveal more than people expect.
 
@@ -252,6 +581,10 @@ instead of exposing the actual topology.
 ---
 
 ## 🙈 7. Establish a Strong `.gitignore`
+
+:::tip[ELI5]
+This section explains how version control helps you review, reproduce, or recover infrastructure configuration.
+:::
 
 Every infrastructure repository should exclude secrets and generated state before the first meaningful commit.
 
@@ -304,6 +637,10 @@ The best time to fix `.gitignore` is **before** a secret is committed.
 
 ## 🧾 8. Treat `.env.example` as an Interface Contract
 
+:::tip[ELI5]
+This section explains how to keep configurable values documented while keeping real secrets out of Git.
+:::
+
 A real `.env` file is private runtime configuration.
 
 An `.env.example` file is public documentation for the stack.
@@ -340,6 +677,10 @@ See [Docker Infrastructure Standards](/homelab/docker-infrastructure-standards/)
 
 ## 🔍 9. Search for Secrets Before the First Commit
 
+:::tip[ELI5]
+This section is about keeping credentials private while still making the system recoverable.
+:::
+
 Before initializing an existing stack directory as a repository, inspect it carefully.
 
 Useful searches include:
@@ -368,6 +709,10 @@ Do not assume a file is safe simply because its filename looks harmless.
 ---
 
 ## 🧪 10. Use Pre-Commit Validation
+
+:::tip[ELI5]
+A small set of automated checks catches many mistakes before they ever reach the remote repository.
+:::
 
 A small set of automated checks catches many mistakes before they ever reach the remote repository.
 
@@ -414,6 +759,10 @@ The exact tool matters less than the principle:
 
 ## 🪝 11. Install the Pre-Commit Hook Locally
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 After configuring pre-commit:
 
 ```bash
@@ -439,6 +788,10 @@ This is especially useful after making a focused edit.
 ---
 
 ## 🔧 12. A Hook That Modifies a File Is Not a Failure
+
+:::tip[ELI5]
+Some pre-commit hooks automatically repair formatting.
+:::
 
 Some pre-commit hooks automatically repair formatting.
 
@@ -469,6 +822,10 @@ Do not bypass the hook simply because it made a trivial formatting correction.
 
 ## ↩️ 13. Normalize Line Endings with `.gitattributes`
 
+:::tip[ELI5]
+This section explains how version control helps you review, reproduce, or recover infrastructure configuration.
+:::
+
 Infrastructure repositories often move between Linux, Windows, editors, and web interfaces.
 
 Without explicit rules, line endings can generate enormous meaningless diffs.
@@ -492,6 +849,10 @@ For shell scripts in particular, LF line endings matter operationally.
 ---
 
 ## 🔎 14. Always Inspect Before Staging
+
+:::tip[ELI5]
+Before `git add`, run: Do not treat `git add .` as the automatic next step after editing.
+:::
 
 Before `git add`, run:
 
@@ -518,6 +879,10 @@ First understand the working tree.
 
 ## 🎯 15. Stage Deliberately
 
+:::tip[ELI5]
+For focused infrastructure changes, stage specific files: For large intentional repository-wide refactors, `git add -A` can be appropriate—but only after inspecting the entire diff.
+:::
+
 For focused infrastructure changes, stage specific files:
 
 ```bash
@@ -540,6 +905,10 @@ For large intentional repository-wide refactors, `git add -A` can be appropriate
 ---
 
 ## 👀 16. Review the Staged Diff
+
+:::tip[ELI5]
+This is one of the most useful commands in the entire workflow.
+:::
 
 After staging:
 
@@ -566,6 +935,10 @@ A clean staged diff should tell a coherent story.
 
 ## 🧹 17. Restore Unrelated Changes Instead of Carrying Them Along
 
+:::tip[ELI5]
+This section walks through getting data or a service back into a working state.
+:::
+
 Sometimes you notice a file was modified unintentionally.
 
 If you do not want the change:
@@ -590,6 +963,10 @@ The important principle is that unrelated local changes should not be dragged in
 ---
 
 ## ✍️ 18. Make Commits Describe One Change
+
+:::tip[ELI5]
+Good infrastructure commits are small enough that you can understand them months later.
+:::
 
 Good infrastructure commits are small enough that you can understand them months later.
 
@@ -624,6 +1001,10 @@ The diff answers:
 
 ## 📝 19. Use Commit Bodies When the Why Matters
 
+:::tip[ELI5]
+A one-line subject is enough for many changes.
+:::
+
 A one-line subject is enough for many changes.
 
 For higher-risk modifications, add context:
@@ -642,6 +1023,10 @@ In a personal homelab, that future someone is often you.
 ---
 
 ## 🌿 20. Use Branches in Proportion to Risk
+
+:::tip[ELI5]
+Not every change needs a feature branch.
+:::
 
 Not every change needs a feature branch.
 
@@ -674,6 +1059,10 @@ It is isolation.
 
 ## 🔀 21. Keep the Main Branch Deployable
 
+:::tip[ELI5]
+Treat the main branch as the last known intended configuration.
+:::
+
 Treat the main branch as the last known intended configuration.
 
 Ideally:
@@ -689,6 +1078,10 @@ This makes recovery much easier because you are not trying to remember whether t
 ---
 
 ## ✅ 22. Test Before Merging
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
 
 For infrastructure changes, a branch should be validated before it is merged.
 
@@ -712,6 +1105,10 @@ Once the configuration is known-good, merge it into `main`.
 
 ## 🧬 23. Prefer Fast-Forward Updates on Production Hosts
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 On hosts where you do not intend to create merge commits during deployment, use:
 
 ```bash
@@ -729,6 +1126,10 @@ If `--ff-only` fails, investigate why.
 ---
 
 ## 🛑 24. Never Pull Over Unreviewed Local Changes
+
+:::tip[ELI5]
+If the working tree is dirty, determine why.
+:::
 
 Before pulling:
 
@@ -762,6 +1163,10 @@ First understand the drift.
 
 ## 🧭 25. Decide Where Edits Are Allowed
 
+:::tip[ELI5]
+This section helps you make this choice using practical criteria rather than adding complexity by default.
+:::
+
 There are two reasonable workflows:
 
 ### Edit on the server
@@ -791,6 +1196,10 @@ The important part is avoiding a third accidental workflow where edits happen in
 ---
 
 ## 🔄 26. A Simple Server-Side Change Workflow
+
+:::tip[ELI5]
+For a small, low-risk change made directly on a host: Then deploy and validate the service.
+:::
 
 For a small, low-risk change made directly on a host:
 
@@ -828,6 +1237,10 @@ This is intentionally uncomplicated.
 
 ## 💻 27. A Workstation-to-Server Workflow
 
+:::tip[ELI5]
+The production host consumes an already reviewed commit rather than serving as the editing environment.
+:::
+
 For larger changes:
 
 ```text
@@ -856,6 +1269,10 @@ This is particularly useful for repository-wide migrations and documentation wor
 
 ## 🖥️ 28. Managing Multiple Hosts
 
+:::tip[ELI5]
+When each major Docker host has its own repository, the workflow stays predictable: Avoid trying to solve cross-host consistency through copying files manually.
+:::
+
 When each major Docker host has its own repository, the workflow stays predictable:
 
 ```text
@@ -873,6 +1290,10 @@ For genuinely shared files, consider a separate templates/reference repository�
 ---
 
 ## 🧩 29. Do Not Force Identical Repositories Across Different Hosts
+
+:::tip[ELI5]
+Consistency is useful.
+:::
 
 Consistency is useful.
 
@@ -896,6 +1317,10 @@ This mirrors the broader principle from the Docker standards guide:
 ---
 
 ## 🛠️ 30. Treat UI-Generated Changes as Real Changes
+
+:::tip[ELI5]
+Management interfaces can modify Compose files or stack configuration.
+:::
 
 Management interfaces can modify Compose files or stack configuration.
 
@@ -927,6 +1352,10 @@ A file modified through a GUI is not somehow exempt from version control.
 
 ## 📚 31. Documentation Changes Belong in the Same Commit
 
+:::tip[ELI5]
+A configuration change is incomplete if the repository documentation now describes the old system.
+:::
+
 A configuration change is incomplete if the repository documentation now describes the old system.
 
 If you change any of the following:
@@ -951,6 +1380,10 @@ A checkout at a historical commit should ideally contain both the configuration 
 ---
 
 ## 🧾 32. Preserve `.env.example` Formatting
+
+:::tip[ELI5]
+This section explains how to keep configurable values documented while keeping real secrets out of Git.
+:::
 
 Example environment files are often edited casually, which leads to gradual drift across a repository.
 
@@ -981,6 +1414,10 @@ Formatting is part of the documentation standard.
 
 ## 🧠 33. Preserve Detailed READMEs
 
+:::tip[ELI5]
+Operational READMEs should not be reduced to a three-command deployment snippet simply for uniformity.
+:::
+
 Operational READMEs should not be reduced to a three-command deployment snippet simply for uniformity.
 
 A mature stack README may contain important context such as:
@@ -1002,6 +1439,10 @@ Consistency should improve documentation, not erase it.
 ---
 
 ## 🚀 34. Separate Commit from Deployment
+
+:::tip[ELI5]
+A commit records intent.
+:::
 
 A commit records intent.
 
@@ -1030,6 +1471,10 @@ If the deployment fails, you know exactly which commit produced the state you ar
 ---
 
 ## 🐳 35. Validate Compose Before Deployment
+
+:::tip[ELI5]
+This section explains the saved configuration Docker uses to recreate the stack consistently.
+:::
 
 Before applying a changed stack:
 
@@ -1063,6 +1508,10 @@ A YAML file can be valid and still describe a broken application.
 
 ## 🩺 36. Define What "Deployed Successfully" Means
 
+:::tip[ELI5]
+For important stacks, write the validation procedure into the README.
+:::
+
 Do not stop at:
 
 ```text
@@ -1088,6 +1537,10 @@ For important stacks, write the validation procedure into the README.
 
 ## 🏷️ 37. Use Tags for Important Milestones
 
+:::tip[ELI5]
+Tags can mark known-good states before large changes.
+:::
+
 Tags can mark known-good states before large changes.
 
 For example:
@@ -1112,6 +1565,10 @@ Tags are most useful when they identify operational milestones you may need to f
 ---
 
 ## ↩️ 38. Roll Back Configuration Carefully
+
+:::tip[ELI5]
+If a configuration change breaks a service, first inspect history: Compare the current state to a known-good commit: If the change is purely configuration, reverting may be straightforward: Then redeploy.
+:::
 
 If a configuration change breaks a service, first inspect history:
 
@@ -1139,6 +1596,10 @@ Prefer `git revert` on shared history because it creates a new commit that expli
 
 ## ⚠️ 39. Git Rollback Does Not Reverse Database Migrations
 
+:::tip[ELI5]
+Databases need deliberate handling because copying live database files is not always a safe backup or migration method.
+:::
+
 This distinction is critical.
 
 Suppose you upgrade an application:
@@ -1159,6 +1620,10 @@ Before major upgrades, consult the application's upgrade documentation and make 
 ---
 
 ## 💾 40. Git Is Not a Backup System for Application Data
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
 Git can recover:
 
@@ -1185,6 +1650,10 @@ See [Backup & Recovery](/homelab/backup-and-recovery/) and [Disaster Recovery](/
 
 ## 🛡️ 41. Git Itself Still Needs Protection
 
+:::tip[ELI5]
+This section explains how version control helps you review, reproduce, or recover infrastructure configuration.
+:::
+
 A distributed Git repository is inherently resilient because clones contain history, but the central Forgejo service should still be protected.
 
 Backup the data required to restore:
@@ -1200,6 +1669,10 @@ Also remember that clones on infrastructure hosts provide an additional copy of 
 ---
 
 ## 🔑 42. Decide How Git Authentication Works
+
+:::tip[ELI5]
+This section explains how version control helps you review, reproduce, or recover infrastructure configuration.
+:::
 
 Common approaches include:
 
@@ -1221,6 +1694,10 @@ Authentication should be convenient enough that you do not start bypassing Git b
 ---
 
 ## 🔗 43. Prefer Stable Remote URLs
+
+:::tip[ELI5]
+A repository should use the normal canonical Forgejo URL rather than an ad hoc temporary clone path.
+:::
 
 Check the configured remote:
 
@@ -1247,6 +1724,10 @@ Do not reclone a working repository merely to change its remote URL.
 ---
 
 ## 🧬 44. Set Tracking Branches Correctly
+
+:::tip[ELI5]
+A local branch should normally track the appropriate remote branch.
+:::
 
 A local branch should normally track the appropriate remote branch.
 
@@ -1275,6 +1756,10 @@ to work without specifying the remote and branch every time.
 
 ## 🗑️ 45. Clean Up Finished Branches
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 After a feature branch has been merged and is no longer needed:
 
 ```bash
@@ -1294,6 +1779,10 @@ Do not delete branches that still contain unique work you intend to keep.
 ---
 
 ## ⚔️ 46. Resolve Push Rejections Instead of Forcing Them
+
+:::tip[ELI5]
+If Git rejects a push because the remote contains newer work, do not immediately reach for: Often the correct solution is simply to integrate the remote change cleanly.
+:::
 
 If Git rejects a push because the remote contains newer work, do not immediately reach for:
 
@@ -1317,6 +1806,10 @@ Force pushes rewrite history and should be exceptional in infrastructure reposit
 
 ## 🔥 47. Avoid `--force` on Shared Main Branches
 
+:::tip[ELI5]
+A force push can erase commits from the remote history.
+:::
+
 A force push can erase commits from the remote history.
 
 That is especially dangerous when multiple hosts clone the repository.
@@ -1335,6 +1828,10 @@ If history rewriting is genuinely necessary, understand every clone that will be
 
 ## 🧯 48. Recover from Accidental Changes with `reflog`
 
+:::tip[ELI5]
+Git keeps a local record of where branch references previously pointed.
+:::
+
 Git keeps a local record of where branch references previously pointed.
 
 If you accidentally reset, rebase, or otherwise lose sight of a commit:
@@ -1350,6 +1847,10 @@ You can often recover the prior commit from there.
 ---
 
 ## 🧱 49. Avoid Committing Large Binary Files
+
+:::tip[ELI5]
+A single large binary committed to Git may remain in repository history even after it is later deleted.
+:::
 
 A single large binary committed to Git may remain in repository history even after it is later deleted.
 
@@ -1369,6 +1870,10 @@ Pre-commit's large-file check is useful precisely because prevention is much eas
 
 ## 📜 50. Scripts Belong in Git When They Encode Operations
 
+:::tip[ELI5]
+This section explains how version control helps you review, reproduce, or recover infrastructure configuration.
+:::
+
 If you repeatedly use the same shell sequence for maintenance, turn it into a script and commit it.
 
 Examples:
@@ -1387,6 +1892,10 @@ Document its purpose and prerequisites in the relevant README.
 ---
 
 ## 🧰 51. Keep Repository-Level Tooling at the Root
+
+:::tip[ELI5]
+Files that govern the entire repository belong at the repository root.
+:::
 
 Files that govern the entire repository belong at the repository root.
 
@@ -1409,6 +1918,10 @@ Repository-wide policy stays at the root.
 
 ## 📖 52. Maintain a Useful Root README
 
+:::tip[ELI5]
+The repository root README should explain the repository itself rather than duplicate every stack README.
+:::
+
 The repository root README should explain the repository itself rather than duplicate every stack README.
 
 Useful sections include:
@@ -1420,7 +1933,7 @@ Useful sections include:
 - Prerequisites
 - Common Git workflow
 - Validation commands
-- Deployment philosophy
+- Deployment approach
 - Backup expectations
 - Security notes
 
@@ -1431,6 +1944,10 @@ The root README is the operating manual for the repository as a whole.
 ---
 
 ## 🧭 53. Keep Public Documentation More General Than Private Repositories
+
+:::tip[ELI5]
+A public documentation site and a private infrastructure repository have different audiences and different security requirements.
+:::
 
 A public documentation site and a private infrastructure repository have different audiences and different security requirements.
 
@@ -1463,6 +1980,10 @@ Share the **method**, not the attack surface.
 
 ## 🔒 54. Assume a Secret Can Eventually Leak
 
+:::tip[ELI5]
+This section is about keeping credentials private while still making the system recoverable.
+:::
+
 `.gitignore` is necessary, but it is not enough.
 
 Humans make mistakes.
@@ -1483,6 +2004,10 @@ The objective is to make accidental disclosure require multiple failures rather 
 
 ## 🚨 55. If a Secret Is Committed, Rotate It
 
+:::tip[ELI5]
+This section is about keeping credentials private while still making the system recoverable.
+:::
+
 Deleting the line in the next commit does **not** make the secret safe.
 
 The previous commit still contains it.
@@ -1502,6 +2027,10 @@ Do not waste time trying to prove nobody saw it before rotating it.
 ---
 
 ## 🔁 56. Audit Repositories Periodically
+
+:::tip[ELI5]
+Infrastructure repositories accumulate drift just like infrastructure itself.
+:::
 
 Infrastructure repositories accumulate drift just like infrastructure itself.
 
@@ -1531,6 +2060,10 @@ A repository that was clean two years ago may no longer describe the environment
 
 ## 🧹 57. Refactor in Reviewable Batches
 
+:::tip[ELI5]
+When cleaning a large repository, avoid rewriting every stack at once unless there is a compelling reason.
+:::
+
 When cleaning a large repository, avoid rewriting every stack at once unless there is a compelling reason.
 
 A safer pattern is:
@@ -1550,6 +2083,10 @@ It also keeps diffs small enough to review meaningfully.
 ---
 
 ## 🛠️ 58. Do Not Rewrite Working Infrastructure for Cosmetic Uniformity
+
+:::tip[ELI5]
+This is one of the most important rules in a mature homelab.
+:::
 
 This is one of the most important rules in a mature homelab.
 
@@ -1572,6 +2109,10 @@ Document intentional exceptions instead.
 ---
 
 ## 📋 59. Routine Change Checklist
+
+:::tip[ELI5]
+Use this as a final verification pass after the main setup is working.
+:::
 
 For a normal infrastructure change:
 
@@ -1597,6 +2138,10 @@ In practice, it becomes a fast routine.
 ---
 
 ## 🧪 60. Major Upgrade Checklist
+
+:::tip[ELI5]
+Use this as a final verification pass after the main setup is working.
+:::
 
 For a higher-risk upgrade:
 
@@ -1624,6 +2169,10 @@ The larger the migration, the more useful Git becomes.
 ---
 
 ## ♻️ 61. Host Rebuild Workflow
+
+:::tip[ELI5]
+One of the best tests of a Git-managed homelab is whether the repository helps you rebuild a lost host.
+:::
 
 One of the best tests of a Git-managed homelab is whether the repository helps you rebuild a lost host.
 
@@ -1657,6 +2206,10 @@ Documentation explains how they fit together.
 
 ## 🧠 62. Source of Truth Does Not Mean Source of Everything
 
+:::tip[ELI5]
+It is common to call Git the "source of truth." That phrase is useful only if interpreted correctly.
+:::
+
 It is common to call Git the "source of truth."
 
 That phrase is useful only if interpreted correctly.
@@ -1682,6 +2235,10 @@ A mature recovery plan knows where each class of information actually lives.
 ---
 
 ## 🚫 63. Common Git Mistakes to Avoid
+
+:::tip[ELI5]
+This section explains how version control helps you review, reproduce, or recover infrastructure configuration.
+:::
 
 Avoid these patterns:
 
@@ -1736,6 +2293,10 @@ Documentation does not need to disclose the network topology to be useful.
 ---
 
 ## 🧰 64. Useful Commands Reference
+
+:::tip[ELI5]
+Pull only if fast-forward is possible.
+:::
 
 Check repository state:
 
@@ -1831,6 +2392,10 @@ pre-commit run --all-files
 
 ## 🔗 Related Guides
 
+:::tip[ELI5]
+The Git workflow is only one part of making infrastructure reproducible.
+:::
+
 The Git workflow is only one part of making infrastructure reproducible.
 
 Continue with:
@@ -1842,7 +2407,11 @@ Continue with:
 
 ---
 
-## 🧠 Final Principle
+## ✅ What to Remember
+
+:::tip[ELI5]
+This is the short version to keep in mind after you finish the page.
+:::
 
 The value of Git in a homelab is not that it makes infrastructure look professional.
 

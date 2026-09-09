@@ -3,15 +3,288 @@ title: "🧠 Self-Hosted AI"
 description: >-
   Build a practical local AI environment for LLM inference, voice assistants, research and coding, autonomous agents, image generation, and private automation.
 ---
-Self-hosting AI is one of the most compelling uses for modern homelab hardware. It can keep sensitive prompts and documents local, reduce dependence on hosted services, make large open models genuinely useful, and let you build workflows that would be awkward or expensive in the cloud.
+**Self-hosted AI** means running AI models and the supporting services on hardware you control rather than sending every prompt, document, image, or audio clip to a hosted provider. That can improve privacy, reduce recurring API cost, make experimentation easier, and let you integrate AI deeply with the rest of a homelab.
 
-But a useful AI lab is not a pile of models and GPUs.
+The confusing part is that “local AI” is not one application. A useful setup may include an LLM inference server, a chat frontend, speech-to-text, text-to-speech, embeddings, image generation, search/scraping tools, and an agent framework.
 
-The goal is to build a **real system**: fast local inference, a voice path that works every day, coding and research tools that can use the web when needed, an agent that can orchestrate longer jobs, and enough separation between components that one upgrade does not take everything down.
+:::tip[ELI5]
+Think of local AI as a set of Lego blocks. The model is only one block; you also need a way to run it, a UI or agent to talk to it, and optional blocks for voice, search, documents, or images.
+:::
+
+## 🪜 A Good Starting Order
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
+1. Run one local model successfully.
+2. Add a simple chat interface.
+3. Standardize on an API so frontends are not tied to one runtime.
+4. Add embeddings/RAG only when you have documents that need it.
+5. Add voice if you have a clear voice-assistant use case.
+6. Add research/browser tools after the core model is reliable.
+7. Add an agent only when the individual tools already work independently.
+8. Scale to larger models or multiple GPUs after you have measured the bottleneck.
+
+## 🧩 Local-AI Terms You Should Know
+
+:::tip[ELI5]
+This section explains local-ai terms you should know in practical terms and what it changes in the homelab.
+:::
+
+- **LLM** — a large language model used for text generation and reasoning.
+- **Inference runtime** — software such as Ollama, llama.cpp, or vLLM that loads a model and serves responses.
+- **Context window** — how much text the model can consider at one time.
+- **Quantization** — reducing model precision to lower memory use, usually with some quality/performance tradeoff.
+- **Embedding** — a numerical representation of text used for semantic search and retrieval.
+- **RAG** — retrieving relevant documents and putting them into the model's context for a specific answer.
+- **Agent** — software that lets a model select tools and perform multi-step work.
 
 ---
 
-## 🧭 Core Principle
+## 🧠 What It Actually Takes to Run a Local Model
+
+:::tip[ELI5]
+A model file by itself does nothing. You need software that loads the model into RAM/VRAM, accepts a prompt, runs the math, and returns generated tokens. That software is the model server or inference runtime.
+:::
+
+A minimal local chat setup has four pieces:
+
+```text
+You
+ ↓
+Chat interface / harness
+ ↓
+Model server (Ollama, llama.cpp, vLLM)
+ ↓
+Model loaded into RAM/VRAM
+```
+
+### 1. The model
+
+The model is the trained neural-network data. Examples include Qwen, Llama, Gemma, Mistral, DeepSeek, and many others.
+
+Models vary by:
+
+- Parameter count
+- Architecture
+- Context length
+- Licensing
+- Native precision
+- Quantization format
+- Tool-calling support
+- Vision/audio support
+
+A `7B` or `8B` model is much easier to run than a 70B+ model. Bigger is not automatically better for every task.
+
+### 2. Compute and memory
+
+Inference needs enough **system RAM or GPU VRAM** to hold the model plus working memory such as the KV cache.
+
+As a rough mental model:
+
+```text
+More parameters + higher precision + longer context
+                 =
+            more memory
+```
+
+A GPU is not mandatory. `llama.cpp` can run useful models on CPU, and Apple Silicon/other unified-memory systems can be excellent local inference machines. A powerful NVIDIA GPU becomes increasingly valuable when you want higher throughput, larger models, long context, multiple users, image generation, or several AI services at once.
+
+### 3. The inference runtime / model server
+
+This is where **Ollama, llama.cpp, and vLLM** fit.
+
+They do not replace the model. They **run** the model.
+
+A runtime is responsible for things such as:
+
+- loading weights
+- allocating RAM/VRAM
+- tokenizing prompts
+- managing the context/KV cache
+- batching requests
+- generating tokens
+- exposing an API
+
+### 4. The harness, frontend, or application
+
+A raw model server is usually just an API. Something still needs to create the conversation and call that API.
+
+Common examples:
+
+| Layer | Example | What it does |
+| :--- | :--- | :--- |
+| Chat frontend | **Open WebUI** | Gives you a ChatGPT-like interface for local/remote models |
+| Coding harness | Continue, Cline-style tools, IDE integrations | Sends code/context to a model and applies coding workflows |
+| Agent harness | **Hermes Agent** | Gives a model tools, persistent workflow logic, delegation, browser/search integrations, etc. |
+| Home automation | Home Assistant Assist pipeline | Connects speech, intents, and home-control tools to AI services |
+| API client | Your own Python/app | Calls the model server directly |
+
+The **harness matters enormously**. The same model can feel far more capable inside a strong coding or agent framework because the harness decides what context to send, what tools are available, and how multi-step work is managed.
+
+### 5. Optional supporting services
+
+Only add these when the use case requires them:
+
+```text
+Speech-to-text  → turns speech into text
+Text-to-speech  → speaks the model response
+Embeddings      → convert documents into searchable vectors
+Vector database → stores/searches those vectors
+RAG             → retrieves relevant document passages for a prompt
+Web search      → finds current information
+Web extraction  → turns web pages into model-friendly text
+Image generation→ creates/edits images with a separate model pipeline
+```
+
+This is why "I want to run AI locally" is not really one installation question. First decide what job you want the system to do.
+
+---
+
+## 🪜 Three Useful Starter Builds
+
+:::tip[ELI5]
+Choose one outcome and build only the pieces required for it. You can combine them later.
+:::
+
+### Starter A — Local private chat
+
+```text
+Ollama
+  ↓
+One instruct model
+  ↓
+Open WebUI
+```
+
+This is the easiest first build. It gives you a local ChatGPT-like interface without needing an agent, RAG system, voice stack, or large GPU server.
+
+### Starter B — High-performance GPU model server
+
+```text
+vLLM
+  ↓
+Large GPU-resident model
+  ↓
+OpenAI-compatible API
+  ↓
+Open WebUI / coding tool / other clients
+```
+
+This is a better fit when you have substantial NVIDIA VRAM and want higher throughput, long context, or several clients sharing one model endpoint.
+
+### Starter C — Local AI agent
+
+```text
+Model server
+  ↓
+Hermes Agent
+  ├── web search
+  ├── web extraction
+  ├── browser/tools
+  └── specialized profiles
+```
+
+Build this **after** the model API and individual tools work reliably. Otherwise every failure becomes "the agent is broken" when the real problem may be DNS, search, browser automation, model tool-calling, authentication, or the inference server.
+
+---
+
+## 🔌 A Concrete First Build: Ollama + Open WebUI
+
+:::tip[ELI5]
+If you have never self-hosted AI, this is the path I would use first. Get one model responding through a browser before adding anything else.
+:::
+
+### Step 1 — Install/run Ollama
+
+Use the current installation method for your operating system from [Ollama's documentation](https://docs.ollama.com/).
+
+After installation, pull a model that fits your hardware. Example:
+
+```bash
+ollama pull qwen3:8b
+```
+
+List installed models:
+
+```bash
+ollama list
+```
+
+Test locally:
+
+```bash
+ollama run qwen3:8b
+```
+
+If that works, the core model/runtime layer is functional.
+
+### Step 2 — Add Open WebUI
+
+A minimal Docker example:
+
+```yaml
+name: open-webui
+
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:latest
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    volumes:
+      - ./data:/app/backend/data
+```
+
+Start it:
+
+```bash
+docker compose up -d
+```
+
+Open:
+
+```text
+http://<SERVER-IP>:3000
+```
+
+Then add your Ollama endpoint in Open WebUI's connection settings. If Open WebUI and Ollama are on different machines, make sure Ollama is intentionally listening on a LAN/Tailscale address and protect that API from public exposure.
+
+### Step 3 — Verify end to end
+
+Do not move on until all three tests work:
+
+1. `ollama run ...` produces a response locally.
+2. Open WebUI can see the model.
+3. A chat in Open WebUI returns a complete response.
+
+Now you have a functioning local AI stack. Everything else in this page is an enhancement to that baseline.
+
+---
+
+## 🧭 Where Ollama, llama.cpp, and vLLM Fit
+
+:::tip[ELI5]
+They are three different engines for running models. Pick the engine based on hardware and workload—not because one is universally "best."
+:::
+
+- **Ollama:** easiest general-purpose starting point and model-management experience.
+- **llama.cpp:** extremely flexible and efficient, especially for GGUF models, CPU inference, Apple Silicon, and unusual hardware/offload combinations.
+- **vLLM:** a high-performance model server aimed at GPU serving, batching, long-running API endpoints, and multi-client workloads. It provides an OpenAI-compatible server.
+
+The detailed comparison later in this guide should now make more sense: you are choosing the **engine underneath the API**, not choosing the entire AI application.
+
+**References:** [vLLM OpenAI-compatible server](https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/), [llama.cpp](https://github.com/ggml-org/llama.cpp), [Ollama](https://docs.ollama.com/)
+
+---
+
+## ✅ What You Need to Know First
+
+:::tip[ELI5]
+A good local AI stack should not depend on one model, one frontend, one runtime, or even one machine.
+:::
 
 > Treat AI as infrastructure: keep the model layer replaceable, keep your data under your control, and assign each workload to the tool that is best at it.
 
@@ -20,6 +293,10 @@ A good local AI stack should not depend on one model, one frontend, one runtime,
 ---
 
 ## 🧱 Think in Layers, Not Products
+
+:::tip[ELI5]
+Keeping those functions separate makes the environment much easier to upgrade and troubleshoot.
+:::
 
 A practical local AI environment usually contains several distinct layers:
 
@@ -58,6 +335,10 @@ Keeping those functions separate makes the environment much easier to upgrade an
 ---
 
 ## 🏗️ A Real-World Local AI Stack
+
+:::tip[ELI5]
+For a capable homelab, I recommend dividing AI into four practical workloads.
+:::
 
 For a capable homelab, I recommend dividing AI into four practical workloads.
 
@@ -144,6 +425,10 @@ No single part of that chain should be irreplaceable.
 
 ## 🖥️ Hardware Roles
 
+:::tip[ELI5]
+A mature setup benefits from assigning hardware by role rather than letting every machine do everything.
+:::
+
 A mature setup benefits from assigning hardware by role rather than letting every machine do everything.
 
 A typical design might look like:
@@ -180,6 +465,10 @@ This separation prevents a large image-generation workload or agent experiment f
 
 ## 💾 Model Storage Strategy
 
+:::tip[ELI5]
+This section explains how to keep storage usable, observable, and recoverable as the homelab grows.
+:::
+
 Modern AI models consume storage surprisingly quickly.
 
 Use **fast local NVMe** for models that are actively served. Use NAS or archival storage for models you want to keep but do not need loaded regularly.
@@ -197,11 +486,15 @@ A useful inventory records:
 - Runtime
 - Intended use
 
-Do not turn model storage into an uncurated landfill. If you have not used a model in months and it is readily downloadable again, deleting it is often the correct decision.
+Keep model storage curated. If a model has not been used in months and is easy to download again, it may not need to occupy fast local storage.
 
 ---
 
 ## ⚙️ Ollama vs llama.cpp vs vLLM
+
+:::tip[ELI5]
+Ollama is an easy way to run and manage local models; this section explains when it is a good fit.
+:::
 
 The three most useful local inference choices are not interchangeable. They optimize for different priorities.
 
@@ -216,6 +509,10 @@ There is no universal winner.
 ---
 
 ## 🦙 Ollama
+
+:::tip[ELI5]
+Ollama is an easy way to run and manage local models; this section explains when it is a good fit.
+:::
 
 Ollama is the easiest default for most homelabs.
 
@@ -289,6 +586,10 @@ ollama ps
 
 ## 🧩 llama.cpp
 
+:::tip[ELI5]
+llama.cpp is a flexible local inference runtime, especially for GGUF models and mixed hardware.
+:::
+
 `llama.cpp` is the most flexible choice when you want direct control over GGUF inference.
 
 It supports CPU inference, GPU offload, mixed CPU/GPU configurations, multiple hardware backends, quantized models, embeddings, reranking, tool calling, speculative decoding, and an OpenAI-compatible HTTP server.
@@ -332,6 +633,10 @@ Ollama wraps many of the model-management details that llama.cpp intentionally e
 ---
 
 ## 🚀 vLLM
+
+:::tip[ELI5]
+vLLM is designed for efficient GPU model serving and is useful when throughput or API serving matters.
+:::
 
 vLLM is designed primarily as a **high-performance model-serving engine** rather than a desktop model manager.
 
@@ -379,6 +684,10 @@ It shines when the model server behaves like a **shared inference appliance**.
 
 ## 🧠 Which Runtime Should You Pick?
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 A useful decision tree is:
 
 ```text
@@ -413,6 +722,10 @@ Because all three can expose broadly OpenAI-compatible interfaces, applications 
 
 ## 🔌 Standardize on APIs, Not Runtimes
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 Whenever possible, connect applications through an OpenAI-compatible endpoint rather than runtime-specific code.
 
 Conceptually:
@@ -432,6 +745,10 @@ That makes it much easier to replace a backend later.
 ---
 
 ## 🗣️ Building a Local Voice Assistant
+
+:::tip[ELI5]
+A local voice assistant is a pipeline of speech recognition, reasoning or intent handling, and speech output.
+:::
 
 A local voice assistant is one of the best examples of why modularity matters.
 
@@ -461,6 +778,10 @@ This avoids sending every simple command through a large language model.
 
 ## 🎙️ Speech-to-Text
 
+:::tip[ELI5]
+Local speech recognition keeps raw microphone audio within your environment.
+:::
+
 Local speech recognition keeps raw microphone audio within your environment.
 
 Useful model families include:
@@ -482,6 +803,10 @@ For a home assistant, shaving a few hundred milliseconds from latency often impr
 
 ## 🔊 Text-to-Speech
 
+:::tip[ELI5]
+Local TTS gives predictable latency and avoids sending every response to a third party.
+:::
+
 Local TTS gives predictable latency and avoids sending every response to a third party.
 
 Useful options include:
@@ -496,6 +821,10 @@ A Wyoming adapter can make an OpenAI-style or custom TTS service available to Ho
 ---
 
 ## 🏠 Home Assistant Integration
+
+:::tip[ELI5]
+A good architecture keeps Home Assistant responsible for automation and device control while AI services provide intelligence around it.
+:::
 
 A good architecture keeps Home Assistant responsible for automation and device control while AI services provide intelligence around it.
 
@@ -514,6 +843,10 @@ AI should augment deterministic automation, not replace it.
 ---
 
 ## 💻 Coding with Local Models
+
+:::tip[ELI5]
+Coding is one of the strongest local LLM workloads because source code can remain private.
+:::
 
 Coding is one of the strongest local LLM workloads because source code can remain private.
 
@@ -540,6 +873,10 @@ A slightly smaller model with a large usable context window is often more produc
 ---
 
 ## 🔎 Local Research Workflows
+
+:::tip[ELI5]
+A model cannot perform current research by itself.
+:::
 
 A model cannot perform current research by itself. It needs tools.
 
@@ -573,6 +910,10 @@ The model is only one part of the research system.
 
 ## 🤖 Hermes Agent
 
+:::tip[ELI5]
+Hermes is an agent layer that can use models and tools for multi-step work; this section explains the relevant setup.
+:::
+
 [Hermes Agent](https://github.com/NousResearch/hermes-agent) from Nous Research is a powerful agent framework that can operate locally while using either local or hosted models.
 
 It is designed for more than chat. Hermes can work with tools, persistent memory, skills, terminal access, browser capabilities, scheduled tasks, messaging gateways, and multiple model providers.
@@ -582,6 +923,10 @@ For a homelab, this makes Hermes useful as a dedicated **AI orchestration layer*
 ---
 
 ## 🦞 What About OpenClaw?
+
+:::tip[ELI5]
+[OpenClaw](https://openclaw.ai/) is another major self-hosted personal-assistant/agent platform and is absolutely worth knowing about.
+:::
 
 [OpenClaw](https://openclaw.ai/) is another major self-hosted personal-assistant/agent platform and is absolutely worth knowing about.
 
@@ -603,6 +948,10 @@ If you are already using OpenClaw, Hermes also includes migration tooling for im
 ---
 
 ## 📦 Installing Hermes Agent
+
+:::tip[ELI5]
+Hermes is an agent layer that can use models and tools for multi-step work; this section explains the relevant setup.
+:::
 
 On Linux, macOS, or WSL2, the upstream installer is:
 
@@ -639,6 +988,10 @@ hermes doctor
 
 ## 👤 Use a Dedicated Hermes Account
 
+:::tip[ELI5]
+Hermes is an agent layer that can use models and tools for multi-step work; this section explains the relevant setup.
+:::
+
 For a persistent agent node, I prefer running Hermes under its own unprivileged Linux account rather than your everyday administrator account.
 
 For example:
@@ -667,6 +1020,10 @@ Do not run a general-purpose autonomous agent as root.
 
 ## 📁 Hermes Data Layout
 
+:::tip[ELI5]
+Hermes is an agent layer that can use models and tools for multi-step work; this section explains the relevant setup.
+:::
+
 A normal per-user Hermes installation keeps its data beneath:
 
 ```text
@@ -692,6 +1049,10 @@ The configuration file and secret environment file serve different purposes: do 
 ---
 
 ## 🔗 Connect Hermes to a Local Ollama Server
+
+:::tip[ELI5]
+Ollama is an easy way to run and manage local models; this section explains when it is a good fit.
+:::
 
 Hermes supports custom OpenAI-compatible endpoints, including Ollama, llama.cpp, vLLM, and similar servers.
 
@@ -725,6 +1086,10 @@ Do **not** publish your private hostname or IP in documentation; use a generic e
 
 ## 📚 Hermes Needs a Large Context Window
 
+:::tip[ELI5]
+Hermes is an agent layer that can use models and tools for multi-step work; this section explains the relevant setup.
+:::
+
 Hermes performs multi-step tool work and maintains substantial working context.
 
 The [Hermes quickstart](https://hermes-agent.nousresearch.com/docs/getting-started/quickstart) specifies at least **64,000 tokens** for tool-enabled agent operation. Allocate 65,536 where the runtime/model supports it, and test actual tool calls.
@@ -751,6 +1116,10 @@ Longer context is not free: KV cache memory can become a major component of VRAM
 
 ## 🧠 Choosing a Hermes Model
 
+:::tip[ELI5]
+Hermes is an agent layer that can use models and tools for multi-step work; this section explains the relevant setup.
+:::
+
 A Hermes model should be selected for **agent reliability**, not just conversational quality.
 
 Prioritize:
@@ -774,6 +1143,10 @@ Before committing to a model, test it on tasks that require:
 ---
 
 ## 🌐 Give Hermes Research Tools
+
+:::tip[ELI5]
+Hermes is an agent layer that can use models and tools for multi-step work; this section explains the relevant setup.
+:::
 
 A local model alone cannot search the current web.
 
@@ -803,6 +1176,10 @@ Do not confuse those functions.
 
 ## 🧰 Hermes Skills and Tools
 
+:::tip[ELI5]
+Hermes is an agent layer that can use models and tools for multi-step work; this section explains the relevant setup.
+:::
+
 Hermes supports tools and reusable skills.
 
 Use them to encode procedures you want the agent to execute consistently, such as:
@@ -821,6 +1198,10 @@ Review them before installation and version-control your own skills where approp
 ---
 
 ## 👥 Hermes Profiles
+
+:::tip[ELI5]
+Hermes is an agent layer that can use models and tools for multi-step work; this section explains the relevant setup.
+:::
 
 Profiles are useful when one Hermes installation needs multiple operating modes.
 
@@ -846,6 +1227,10 @@ This is preferable to constantly rewriting one global configuration.
 
 ## 💬 Optional Hermes Messaging Gateway
 
+:::tip[ELI5]
+Hermes is an agent layer that can use models and tools for multi-step work; this section explains the relevant setup.
+:::
+
 After CLI inference and tools work, configure only the messaging platform you need:
 
 ```bash
@@ -863,13 +1248,17 @@ hermes gateway start
 hermes gateway status
 ```
 
-Use the [gateway documentation](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/) for logout/boot persistence. On Devuan or Artix without systemd, use a deliberately configured supervisor running as the unprivileged agent account; the systemd installation commands are not an init-neutral recipe.
+Use the [gateway documentation](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/) for logout/boot persistence. On Artix or another distribution without systemd, use a deliberately configured supervisor running as the unprivileged agent account; the systemd installation commands are not an init-neutral recipe.
 
 For OpenClaw migration, back up both applications first, inspect `hermes --help` for migration options in your installed release, and review supported import fields before running them. An import is not proof that credentials, tools, or message routing are configured safely.
 
 ---
 
 ## 🔀 Hybrid Local + Cloud Agents
+
+:::tip[ELI5]
+Running Hermes locally does not require every inference request to be local.
+:::
 
 Running Hermes locally does not require every inference request to be local.
 
@@ -890,6 +1279,10 @@ The privacy boundary should be explicit: do not silently route sensitive work to
 ---
 
 ## 🛡️ Agent Security
+
+:::tip[ELI5]
+This section focuses on reducing unnecessary access and limiting the damage if something goes wrong.
+:::
 
 An agent with shell access is fundamentally different from a chatbot.
 
@@ -921,6 +1314,10 @@ Never assume the LLM itself is a security boundary.
 
 ## 🚫 Do Not Give an Agent Everything
 
+:::tip[ELI5]
+Avoid giving a general-purpose agent: If a task needs privileged action, use a narrowly scoped mechanism rather than handing the agent administrator credentials.
+:::
+
 Avoid giving a general-purpose agent:
 
 - Root access
@@ -935,6 +1332,10 @@ If a task needs privileged action, use a narrowly scoped mechanism rather than h
 ---
 
 ## 🌐 Agent Network Access
+
+:::tip[ELI5]
+This section covers a network dependency or boundary you should understand before adding more complexity.
+:::
 
 Agents should be able to reach what they need—but not everything simply because it is convenient.
 
@@ -952,6 +1353,10 @@ A research agent may need the public web and an inference endpoint but no access
 ---
 
 ## 🖼️ Image Generation with ComfyUI
+
+:::tip[ELI5]
+ComfyUI remains one of the best local image-generation environments because the workflow graph makes the entire pipeline visible and reproducible.
+:::
 
 ComfyUI remains one of the best local image-generation environments because the workflow graph makes the entire pipeline visible and reproducible.
 
@@ -979,6 +1384,10 @@ Image generation can consume GPU memory aggressively, so it is often worth assig
 
 ## 🎮 Multi-GPU Allocation
 
+:::tip[ELI5]
+This section focuses on the GPU-specific measurements or decisions that matter for local AI workloads.
+:::
+
 On systems with several GPUs, explicit workload ownership prevents contention.
 
 For example:
@@ -1000,6 +1409,10 @@ There is no universal correct split. Measure your actual workloads.
 ---
 
 ## 📊 Measure Instead of Guessing
+
+:::tip[ELI5]
+Benchmark the tasks you actually perform rather than choosing a runtime based on synthetic leaderboards alone.
+:::
 
 Useful metrics include:
 
@@ -1033,6 +1446,10 @@ Benchmark the tasks you actually perform rather than choosing a runtime based on
 
 ## 🧮 Quantization
 
+:::tip[ELI5]
+Quantization reduces memory consumption and can make much larger models practical on local hardware.
+:::
+
 Quantization reduces memory consumption and can make much larger models practical on local hardware.
 
 But lower precision can affect:
@@ -1049,6 +1466,10 @@ For important agent workloads, a higher-quality quantization can be worth the ad
 ---
 
 ## 📚 Embeddings and Retrieval
+
+:::tip[ELI5]
+Keep the embedding model separate from the chat model.
+:::
 
 Embeddings are useful for:
 
@@ -1082,6 +1503,10 @@ This allows the embedding and generation models to be upgraded independently.
 
 ## 🧠 RAG Is Not Memory
 
+:::tip[ELI5]
+RAG retrieves relevant information and gives it to the model for the current answer; it is not the same thing as permanent memory.
+:::
+
 Retrieval-augmented generation and agent memory solve different problems.
 
 **RAG** answers:
@@ -1098,6 +1523,10 @@ Treat them as separate systems.
 
 ## 🗃️ Model Backups
 
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
 AI models are often reproducible downloads, but that does not mean every model needs to be downloaded again after a failure.
 
 Back up or archive models when:
@@ -1113,6 +1542,10 @@ For easily reproducible public models, keeping a manifest may be more valuable t
 ---
 
 ## 🧰 Containers vs Native Install
+
+:::tip[ELI5]
+Containers are replaceable application instances; this section explains how to operate them without losing persistent state.
+:::
 
 Containers are excellent for AI services when:
 
@@ -1135,6 +1568,10 @@ Do not force every AI tool into Docker merely for aesthetic consistency.
 
 ## 🌐 Frontends Such as Open WebUI
 
+:::tip[ELI5]
+Treat it as a separate application from the inference runtime.
+:::
+
 A frontend can provide:
 
 - Chat history
@@ -1153,6 +1590,10 @@ The frontend should be replaceable without forcing you to rebuild the model laye
 ---
 
 ## 🔐 Keep AI APIs Private
+
+:::tip[ELI5]
+Many inference engines assume a trusted environment.
+:::
 
 Many inference engines assume a trusted environment.
 
@@ -1173,6 +1614,10 @@ Note that runtime-level API keys do not necessarily protect every diagnostic or 
 
 ## 🔑 Keep Secrets Out of Prompts
 
+:::tip[ELI5]
+This section is about keeping credentials private while still making the system recoverable.
+:::
+
 Local inference does not make poor secret handling safe.
 
 Do not casually paste:
@@ -1191,6 +1636,10 @@ Agent logs, transcripts, tool traces, and application databases may retain more 
 
 ## 🔄 Updates and Reproducibility
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 AI projects move quickly and occasionally break compatibility.
 
 Before upgrading an important component:
@@ -1207,6 +1656,10 @@ Do not treat `latest` as a stability strategy.
 ---
 
 ## 🧪 Validate the Entire Pipeline
+
+:::tip[ELI5]
+A model returning tokens is not enough.
+:::
 
 A model returning tokens is not enough.
 
@@ -1242,6 +1695,10 @@ End-to-end testing catches integration failures that component benchmarks miss.
 
 ## ⚡ A Practical Recommended Stack
 
+:::tip[ELI5]
+The important word is **role**.
+:::
+
 A mature local AI homelab might use:
 
 | Role | Example |
@@ -1267,6 +1724,10 @@ The important word is **role**. Every product in this table can be replaced.
 ---
 
 ## 🪜 Start Small, Then Add Capability
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
 
 Do not build the entire architecture on day one.
 
@@ -1330,6 +1791,10 @@ Add vLLM, additional GPUs, dedicated nodes, or model routing only when your work
 
 ## 🧹 What Not to Do
 
+:::tip[ELI5]
+This section explains what not to do in practical terms and what it changes in the homelab.
+:::
+
 Avoid these common mistakes:
 
 - Installing dozens of models without a purpose
@@ -1346,6 +1811,10 @@ Avoid these common mistakes:
 ---
 
 ## ✅ Recommended Baseline
+
+:::tip[ELI5]
+For most technically advanced home users, I would start with: Add ComfyUI separately for image generation and add vLLM only when concurrency or throughput becomes a real requirement.
+:::
 
 For most technically advanced home users, I would start with:
 
@@ -1371,6 +1840,10 @@ Keep llama.cpp available when you need GGUF flexibility, CPU offload, unusual ha
 
 ## 📚 Upstream Documentation
 
+:::tip[ELI5]
+Your local DNS server still needs somewhere to ask for allowed domains; this section explains that next hop.
+:::
+
 Because local AI tooling changes quickly, verify commands against upstream documentation before major deployments or upgrades:
 
 - [Ollama documentation](https://docs.ollama.com/)
@@ -1382,7 +1855,11 @@ Because local AI tooling changes quickly, verify commands against upstream docum
 
 ---
 
-## 🧠 Final Thought
+## ✅ What to Remember
+
+:::tip[ELI5]
+This is the short version to keep in mind after you finish the page.
+:::
 
 The best self-hosted AI environment is not the one with the most GPUs, models, or containers.
 

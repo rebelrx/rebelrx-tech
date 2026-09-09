@@ -1,23 +1,63 @@
 ---
-title: "🔒 Tailscale VPN (Devuan + Non-systemd)"
+title: "🔒 Tailscale VPN for Homelab Remote Access"
 description: >-
-  Secure remote access to your homelab with Tailscale on non-systemd Linux — Devuan sysvinit setup, subnet routing, exit nodes, and ACLs without opening a single port.
+  Securely reach your homelab with Tailscale on Debian and other devices, then optionally add MagicDNS, subnet routing, exit nodes, and access-control rules without exposing administrative services directly to the internet.
 ---
-A practical guide to reaching your homelab from anywhere **without opening a single port** to the internet.
+**Tailscale** creates a private network between your own devices using WireGuard encryption. It is useful when you want to reach a server, NAS, dashboard, or other homelab service while away from home without forwarding that service's port to the public internet.
 
-Most Tailscale guides assume systemd and those guides are readily available. This one covers **Devuan (sysvinit)** for your server, where Tailscale ships no init support at all, plus the OpenRC setup for Artix desktops.
+:::tip[ELI5]
+Tailscale makes your laptop, phone, and homelab machines behave as if they are on the same private network even when they are in different places. You install it on the devices, sign them into the same tailnet, and then connect using their private Tailscale addresses or names.
+:::
+
+## 🪜 What You Will Do
+
+:::tip[ELI5]
+This section explains what you will do in practical terms and what it changes in the homelab.
+:::
+
+1. Install Tailscale on a homelab machine.
+2. Join it to your tailnet.
+3. Install Tailscale on your remote device.
+4. Test direct access to the homelab machine.
+5. Enable MagicDNS if you want names instead of IP addresses.
+6. Optionally configure a subnet router to reach devices that cannot run Tailscale themselves.
+7. Optionally configure an exit node if you specifically need one.
+8. Review access-control policy before adding lower-trust users or devices.
+
+## 🧩 Tailscale Terms You Should Know
+
+:::tip[ELI5]
+This section explains private remote access through your tailnet rather than exposing the service directly to the internet.
+:::
+
+- **Tailnet** — your private Tailscale network.
+- **Node** — a device joined to that network.
+- **WireGuard** — the encrypted tunneling protocol used for Tailscale's data plane.
+- **MagicDNS** — Tailscale's naming system for reaching devices by name.
+- **Subnet router** — a Tailscale node that provides access to another local network subnet.
+- **Exit node** — a Tailscale node that can route a client's general internet traffic.
+
+The main server path below uses Debian 13. An Artix/OpenRC example is included because the client workflow is slightly different there.
 
 ---
 
-## ⚠️ Core Principle
+## ✅ What You Need to Know First
 
-> Exposure is the enemy. Access should be private by default, and granted deliberately.
+:::tip[ELI5]
+Port forwarding exposes services to the entire internet and hopes your login pages hold.
+:::
 
-Port forwarding exposes services to the entire internet and hopes your login pages hold. A mesh VPN inverts that: nothing is reachable unless the device is **yours and authenticated**.
+> Keep administrative access private by default. Expose only the services that genuinely need public access.
+
+For administrative services, a mesh VPN is usually simpler and safer than publishing management ports to the internet. Only authenticated devices that your tailnet policy allows can reach those private paths.
 
 ---
 
 ## 🧭 What Tailscale Is
+
+:::tip[ELI5]
+This section explains private remote access through your tailnet rather than exposing the service directly to the internet.
+:::
 
 Tailscale builds a private mesh network (a "tailnet") between your devices using **WireGuard**, the modern, audited VPN protocol used for the encrypted data plane. Tailscale commonly implements WireGuard in userspace.
 
@@ -32,6 +72,10 @@ Tailscale builds a private mesh network (a "tailnet") between your devices using
 
 ## ⚖️ The Honest Tradeoff
 
+:::tip[ELI5]
+Tailscale is not fully self-hosted by default.
+:::
+
 Tailscale is not fully self-hosted by default. Understand what you're trusting:
 
 | Component | Status |
@@ -42,142 +86,58 @@ Tailscale is not fully self-hosted by default. Understand what you're trusting:
 
 The coordination server only exchanges public keys and connection metadata; it **cannot decrypt your traffic**. But it does see which devices exist and when they connect.
 
-:::tip[Full sovereignty option: Headscale]
+:::tip[Self-hosted control-server option: Headscale]
 [Headscale](https://github.com/juanfont/headscale) is an open-source, self-hostable
 replacement for Tailscale's coordination server. The official Tailscale clients
 connect to it directly.
 
-Recommended path: start with hosted Tailscale to learn the model, migrate to
-Headscale once your tailnet is stable. Headscale requires its own control-server URL and policy setup; follow its client registration instructions rather than assuming hosted Tailscale commands are identical.
+If you specifically want to self-host the coordination layer, Headscale is an option. It requires its own control-server URL and policy setup, so follow Headscale's registration instructions rather than assuming the hosted Tailscale commands are identical.
 :::
 ---
 
 ## ⚙️ Requirements
 
-- A Devuan server (see the [Devuan Server Install Guide](/linux/devuan-server-install/))
+:::tip[ELI5]
+Check the current [Tailscale plans](https://tailscale.com/pricing) for user, device, and feature limits; plan allowances can change.
+:::
+
+- A Debian 13 server or another supported Linux system
 - A free Tailscale account → <https://login.tailscale.com/start>
-  - Sign-in is via an identity provider. To keep Big Tech out of the loop, use **Passkey** sign-up or a GitHub account rather than a Google/Microsoft login.
+  - Choose whichever supported sign-in method fits your account-security preferences; protect the account with strong MFA/passkeys where available.
 
 Check the current [Tailscale plans](https://tailscale.com/pricing) for user, device, and feature limits; plan allowances can change.
 
 ---
 
-## 📦 Install on Devuan (Server)
+## 📦 Install on Debian 13 (Server)
+
+:::tip[ELI5]
+Install the Tailscale package, start the service, then run one command that gives you a login link. After authentication, the server becomes a node on your private tailnet.
+:::
 
 ### 1. Add the Tailscale Repository
 
-Tailscale's `.deb` repository is keyed by **Debian** codename — the same mapping trick used in the [Docker Homelab guide](/homelab/docker-home-lab/).
-
 ```bash
-sudo apt update
-sudo apt install -y ca-certificates curl gnupg
+sudo mkdir -p --mode=0755 /usr/share/keyrings
 
-# Devuan ships its own codename; Tailscale's Debian repo needs the Debian base:
-#   Devuan 5  "Daedalus"  → bookworm
-#   Devuan 6  "Excalibur" → trixie
-DEBIAN_CODENAME=trixie   # set to match your Devuan release's Debian base
-
-curl -fsSL https://pkgs.tailscale.com/stable/debian/${DEBIAN_CODENAME}.noarmor.gpg | \
+curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg | \
   sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg > /dev/null
 
-echo \
-  "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] \
-  https://pkgs.tailscale.com/stable/debian \
-  ${DEBIAN_CODENAME} main" | \
+curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.tailscale-keyring.list | \
   sudo tee /etc/apt/sources.list.d/tailscale.list > /dev/null
 
 sudo apt update
 sudo apt install -y tailscale
 ```
 
-:::note[Expect a harmless error]
-The package's post-install step tries to talk to systemd and will complain.
-Inspect the error and `dpkg --audit`; do not ignore a failed package configuration. Confirm the binaries are installed and check whether your package already supplies an init script before adding the example below.
-:::
----
+### 2. Verify the Daemon
 
-### 2. Create the sysvinit Script
-
-If the installed package has no sysvinit script, create one. Do not overwrite a packaged or locally maintained service script:
+The package installs a systemd service on Debian. Confirm it is running:
 
 ```bash
-sudo nano /etc/init.d/tailscaled
+sudo systemctl enable --now tailscaled
+sudo systemctl status tailscaled --no-pager
 ```
-
-Paste the following:
-
-```bash
-#!/bin/sh
-### BEGIN INIT INFO
-# Provides:          tailscaled
-# Required-Start:    $local_fs $network $syslog
-# Required-Stop:     $local_fs $network $syslog
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: Tailscale node agent
-# Description:       Tailscale mesh VPN daemon
-### END INIT INFO
-
-PATH=/sbin:/bin:/usr/sbin:/usr/bin
-DAEMON=/usr/sbin/tailscaled
-PIDFILE=/var/run/tailscaled.pid
-NAME=tailscaled
-DESC="Tailscale daemon"
-
-DAEMON_ARGS="--state=/var/lib/tailscale/tailscaled.state --socket=/run/tailscale/tailscaled.sock --port=41641"
-
-test -x $DAEMON || exit 0
-
-. /lib/lsb/init-functions
-
-case "$1" in
-  start)
-    log_daemon_msg "Starting $DESC" "$NAME"
-    mkdir -p /run/tailscale /var/lib/tailscale
-    start-stop-daemon --start --quiet --background \
-      --make-pidfile --pidfile $PIDFILE \
-      --exec $DAEMON -- $DAEMON_ARGS
-    log_end_msg $?
-    ;;
-  stop)
-    log_daemon_msg "Stopping $DESC" "$NAME"
-    start-stop-daemon --stop --quiet --oknodo --retry 10 --pidfile $PIDFILE
-    $DAEMON --cleanup
-    rm -f $PIDFILE
-    log_end_msg $?
-    ;;
-  restart|force-reload)
-    $0 stop
-    sleep 1
-    $0 start
-    ;;
-  status)
-    status_of_proc -p $PIDFILE $DAEMON $NAME
-    ;;
-  *)
-    echo "Usage: /etc/init.d/$NAME {start|stop|restart|status}"
-    exit 1
-    ;;
-esac
-
-exit 0
-```
-
-Make it executable and register it with the default runlevels:
-
-```bash
-sudo chmod +x /etc/init.d/tailscaled
-sudo update-rc.d tailscaled defaults
-sudo /etc/init.d/tailscaled start
-```
-
-Verify it's running:
-
-```bash
-sudo /etc/init.d/tailscaled status
-```
-
----
 
 ### 3. Join Your Tailnet
 
@@ -185,21 +145,22 @@ sudo /etc/init.d/tailscaled status
 sudo tailscale up
 ```
 
-Follow the printed URL in a browser to authenticate the machine.
+Open the printed URL, authenticate, and approve the device if your tailnet policy requires it.
 
-> You only do this once. The daemon stores its authenticated state in
-> `/var/lib/tailscale/` and reconnects automatically on every boot.
-
-Confirm the node is up and note its address:
+Verify:
 
 ```bash
 tailscale status
 tailscale ip -4
 ```
 
----
+The node should now be reachable from another permitted Tailscale device.
 
 ## 🖥️ Install on Artix (Desktop / Laptop)
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
 
 Artix packages the init scripts separately per init system:
 
@@ -218,6 +179,10 @@ This matches the post-install section of the [Artix Desktop Install Guide](/linu
 
 ## 📱 Other Devices
 
+:::tip[ELI5]
+Devices can reach one another only as allowed by the tailnet policy and host firewall.
+:::
+
 Install the Tailscale app on your phone or tablet and sign in to the same account:
 
 - Android → F-Droid or Play Store
@@ -228,6 +193,10 @@ Devices can reach one another only as allowed by the tailnet policy and host fir
 ---
 
 ## 🌐 MagicDNS (Names Instead of IPs)
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 In the Tailscale admin console → **DNS**, enable **MagicDNS**.
 
@@ -249,6 +218,10 @@ Rename machines in the admin console (**Machines** → the `…` menu) to keep n
 
 ## 🔑 Disable Key Expiry on Servers
 
+:::tip[ELI5]
+By default, every node's keys expire after ~6 months, and the node **drops off your tailnet until you re-authenticate it interactively**.
+:::
+
 By default, every node's keys expire after ~6 months, and the node **drops off your tailnet until you re-authenticate it interactively**.
 
 Fine for laptops. Frustrating for headless servers.
@@ -259,9 +232,13 @@ In the admin console → **Machines** → your server → `…` → **Disable ke
 
 ## 🏠 Subnet Router (Reach Your Whole LAN)
 
+:::tip[ELI5]
+Some devices can't run Tailscale — a NAS, printers, IoT appliances, IPMI interfaces.
+:::
+
 Some devices can't run Tailscale — a NAS, printers, IoT appliances, IPMI interfaces. A **subnet router** lets one Tailscale node bridge your whole LAN.
 
-### 1. Enable IP Forwarding (on the Devuan server)
+### 1. Enable IP Forwarding (on the subnet-router server)
 
 ```bash
 echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.conf
@@ -289,6 +266,10 @@ Now your phone on cellular can reach devices on the approved subnet devices as i
 
 ## 🚪 Exit Node (Optional)
 
+:::tip[ELI5]
+An exit node routes **all** of a device's internet traffic through your device's connection which is useful when traveling, particularly on hotel or airport Wi-Fi.
+:::
+
 An exit node routes **all** of a device's internet traffic through your device's connection which is useful when traveling, particularly on hotel or airport Wi-Fi.
 
 A real-world example: you set your Apple TV at home with Tailscale installed as an exit node. While traveling to another country connected to public Wi-Fi at a local internet cafe, your phone's connection is routed securely through your Apple TV so your traffic and location can't be sniffed by the local ISP or public scammers. 
@@ -307,6 +288,10 @@ Use `tailscale set` to change selected preferences on an already connected node.
 ---
 
 ## 🐳 Accessing Homelab Services
+
+:::tip[ELI5]
+With Tailscale up, your [Docker services](/homelab/docker-home-lab/) are reachable with **zero exposed ports**.
+:::
 
 With Tailscale up, your [Docker services](/homelab/docker-home-lab/) are reachable with **zero exposed ports**:
 
@@ -328,6 +313,10 @@ The clean pattern:
 ---
 
 ## 🛡️ ACLs (Lock Down Who Reaches What)
+
+:::tip[ELI5]
+By default, every device on your tailnet can reach every other device.
+:::
 
 By default, every device on your tailnet can reach every other device. For a single-user homelab that's acceptable — but tighten it as you grow.
 
@@ -361,6 +350,10 @@ low-privilege user — for anything unattended.
 
 ## 🔐 Security Best Practices
 
+:::tip[ELI5]
+This section focuses on reducing unnecessary access and limiting the damage if something goes wrong.
+:::
+
 - Protect your Tailscale login with strong 2FA; it is now the key to your entire infrastructure
 - Remove old devices from the admin console when you retire hardware
 - Use tags and ACLs once more than one person joins your tailnet
@@ -370,6 +363,10 @@ low-privilege user — for anything unattended.
 
 ## 🧰 Troubleshooting
 
+:::tip[ELI5]
+Work through these checks in order so you isolate the failing layer instead of changing several things at once.
+:::
+
 ```bash
 tailscale status        # who's connected, and how (direct vs relayed)
 tailscale netcheck      # NAT type, nearest DERP relay, port mapping info
@@ -378,14 +375,18 @@ tailscale ping machinename   # verify connectivity + path to a node
 
 Common issues:
 
-- **`failed to connect to local tailscaled`** → the daemon isn't running. `sudo /etc/init.d/tailscaled start` (Devuan) or `sudo rc-service tailscaled start` (Artix).
+- **`failed to connect to local tailscaled`** → the daemon is not running. On Debian use `sudo systemctl restart tailscaled`; on Artix/OpenRC use `sudo rc-service tailscaled restart`.
 - **Connections show `relay` instead of `direct`** → traffic is bouncing through Tailscale's DERP relays. Still encrypted, just slower. Direct connectivity depends on both peers' NAT/firewall behavior; inspect `tailscale netcheck` and upstream firewall guidance before changing rules.
 - **Subnet routes not working** → route not approved in the admin console, or IP forwarding not enabled. Check both.
 - **Node vanished from the tailnet** → key expiry. Re-authenticate with `sudo tailscale up`, then disable expiry so it doesn't recur.
 
 ---
 
-## 🧠 Final Thought
+## ✅ What to Remember
+
+:::tip[ELI5]
+This is the short version to keep in mind after you finish the page.
+:::
 
 Every forwarded port is a standing invitation to the entire internet.
 

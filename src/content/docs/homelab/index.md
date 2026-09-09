@@ -1,26 +1,51 @@
 ---
 title: "🏠 Homelab"
 description: >-
-  Build a sovereign, privacy-first homelab: Docker standards, private networking, DNS filtering, local AI, monitoring, Git-managed infrastructure, storage, and tested disaster recovery.
+  Build a practical homelab from start to finish: Docker, Git-managed configuration, NAS storage, DNS filtering, private remote access, monitoring, backups, disaster recovery, and local AI.
 ---
-Guides for building a sovereign, privacy-first homelab you fully control.
+A homelab is simply a collection of computers, storage, networking, and software you run yourself to learn, experiment, automate, or host services at home. It can be one mini PC with Docker or a full rack; the useful part is what it lets you build, not how elaborate it looks.
 
-This section focuses on:
+These guides are written to hopefully provide up-front context and then more technical, hands-on guidance. Each page starts with the plain-English idea, defines the terms you need, gives you an implementation path, and then provides the deeper reference material that helps when you want to expand or troubleshoot the setup.
 
-- Self-hosting critical services
-- Eliminating unnecessary cloud dependency
-- Designing systems that are stable, observable, and maintainable
-- Taking back ownership of your data and infrastructure
+:::tip[ELI5]
+You do not need to understand the entire homelab before starting. Pick one useful service, get it working cleanly, document it, back it up, and add the next layer only when it solves a real problem.
+:::
+
+## 🧭 If You Are New, Follow This Order
+
+:::tip[ELI5]
+This section is a suggested order of operations for getting your homelab up and running
+:::
+
+1. **Docker Homelab** — learn what containers are and run your first stack.
+2. **Docker Infrastructure Standards** — organize stacks and persistent data consistently.
+3. **Git-Managed Homelab** — put reproducible configuration under version control.
+4. **NAS Mounting** — attach shared storage when applications need it.
+5. **DNS & Network Privacy** — add network-wide filtering and sane DNS behavior.
+6. **Tailscale** — add private remote access.
+7. **Nginx Proxy Manager** — add friendly HTTPS names for internal web apps.
+8. **Monitoring & Management** — learn when something is down or filling up.
+9. **Backup & Recovery** — protect the data and application state that matter.
+10. **Disaster Recovery** — document how to rebuild after a larger failure.
+11. **Self-Hosted AI** — add local AI once the underlying compute, storage, networking, and backup layers are solid.
 
 ---
 
-## ⚠️ Core Principle
+## ✅ What You Need to Know First
 
-> If you don’t control your infrastructure, you don’t control your data.
+:::tip[ELI5]
+A good homelab is understandable, reproducible, and recoverable.
+:::
+
+A good homelab is understandable, reproducible, and recoverable. Start with a working service, then add standards, storage, access, monitoring, and backups as the need appears.
 
 ---
 
 ## 🧭 Start Here
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
 
 ### [Docker Homelab](/homelab/docker-home-lab/)
 
@@ -38,6 +63,10 @@ Use Git/Forgejo as the configuration history and source of truth for infrastruct
 
 ## 🌐 Network & Access
 
+:::tip[ELI5]
+This section covers a network dependency or boundary you should understand before adding more complexity.
+:::
+
 ### [Tailscale](/homelab/tailscale/)
 
 Private remote access without exposing administrative services directly to the Internet.
@@ -53,6 +82,10 @@ Reverse-proxy patterns for services that need clean internal or controlled exter
 ---
 
 ## 💾 Storage & Recovery
+
+:::tip[ELI5]
+This section is about getting from a failure back to a verified working system.
+:::
 
 ### [Mounting NAS Storage](/homelab/nas-mounting/)
 
@@ -70,6 +103,10 @@ Recovery order, full-host rebuilds, key recovery, offsite planning, and restore 
 
 ## 🧠 Local AI
 
+:::tip[ELI5]
+Local LLMs, embeddings, image generation, speech recognition, text-to-speech, GPU allocation, and safe agent architecture.
+:::
+
 ### [Self-Hosted AI](/homelab/self-hosted-ai/)
 
 Local LLMs, embeddings, image generation, speech recognition, text-to-speech, GPU allocation, and safe agent architecture.
@@ -80,6 +117,10 @@ Local AI belongs in the homelab when it provides a real benefit: privacy, latenc
 
 ## 📊 Monitoring & Management
 
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
+
 ### [Homelab Monitoring & Management](/homelab/monitoring-and-management/)
 
 Host reachability, system metrics, Docker management, service health, storage capacity, GPU monitoring, and actionable alerting.
@@ -88,7 +129,11 @@ Host reachability, system metrics, Docker management, service health, storage ca
 
 ---
 
-## 🧱 Design Philosophy
+## 🧱 Practical Design Guidelines
+
+:::tip[ELI5]
+This section explains practical design guidelines in practical terms and what it changes in the homelab.
+:::
 
 Homelab is built around:
 
@@ -114,6 +159,10 @@ It avoids:
 
 ## 🧭 A Sensible Learning Order
 
+:::tip[ELI5]
+Test disaster recovery before going live to production!
+:::
+
 If you are building from scratch:
 
 1. Install a clean Linux server
@@ -131,15 +180,19 @@ If you are building from scratch:
 
 ## 🚧 Future Guides
 
+:::tip[ELI5]
+This section explains future guides in practical terms and what it changes in the homelab.
+:::
+
 - Self-Hosted Retro Gaming with RomM
 - Home Assistant infrastructure integration
 
 ---
 
-## 🧠 Final Thought
+## ✅ What to Remember
 
-Cloud platforms optimize for scale and data aggregation.
+:::tip[ELI5]
+This is the short version to keep in mind after you finish the page.
+:::
 
-Your homelab should optimize for:
-
-> Control, reliability, recoverability, and understanding.
+A useful homelab is one you can operate without guessing. Keep the configuration understandable, protect the data that matters, and make sure you know how to rebuild the pieces that fail.

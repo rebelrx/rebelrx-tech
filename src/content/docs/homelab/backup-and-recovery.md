@@ -3,23 +3,137 @@ title: "💾 Backup Architecture & Recovery"
 description: >-
   A practical, layered backup architecture for a self-hosted homelab using Git for reproducible configuration, Kopia for versioned local backups, NAS storage, off-site disaster recovery, and routine restore testing.
 ---
+A **backup** is an independent copy of data that lets you recover after deletion, corruption, hardware failure, or another loss. A useful backup system is not just “another copy somewhere”; it should preserve enough history that you can go back to a known-good version and it should be tested often enough that you know restoration actually works.
 
-A backup strategy should answer four questions clearly:
+:::tip[ELI5]
+A backup is your undo button after something important is gone or broken. The job is not finished when the backup says “success”—it is finished when you can restore the right files and applications from it.
+:::
 
-1. **What am I protecting?**
-2. **Where is each independent copy?**
-3. **How far back can I recover?**
-4. **Can I actually restore it?**
+## 🪜 A Practical Backup Setup Order
 
-For a modern homelab, the answer is rarely one tool. Configuration, application state, AI models, personal documents, and large media libraries have different recovery needs and should be protected accordingly.
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
-This guide describes the layered model I use for RebelRx infrastructure while intentionally keeping internal hostnames, paths, addresses, and network topology private.
+1. List the data that is irreplaceable or painful to recreate.
+2. Keep infrastructure configuration in Git where appropriate.
+3. Back up application data and databases with a versioned backup tool.
+4. Store the backup repository on storage that can fail independently from the computer being protected.
+5. Keep critical recovery credentials outside that same failure domain.
+6. Maintain an off-site copy for data that must survive theft, fire, or total site loss.
+7. Test ordinary file restores regularly and full application restores periodically.
 
-For the full failure-and-rebuild sequence, see the [Disaster Recovery Runbook](/homelab/disaster-recovery/).
+This guide uses Git, versioned backups such as Kopia, NAS storage, and off-site storage as complementary layers. You do not need the exact same products; you need the same recovery properties.
+
+## 🧩 Backup Terms You Should Know
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
+- **Snapshot** — a point-in-time view of backed-up data.
+- **Retention** — the rules that decide how many old snapshots you keep.
+- **Repository** — the storage location where the backup tool writes protected data.
+- **RPO** — how much recent data you can tolerate losing.
+- **RTO** — how long you can tolerate the recovery taking.
+- **Off-site backup** — a copy stored outside the physical location of the primary systems.
 
 ---
 
-## 🧭 Core Principle
+## 3️⃣-2️⃣-1️⃣ Start With the 3-2-1 Backup Rule
+
+:::tip[ELI5]
+For important data, keep three copies: the live copy plus two backups, stored across at least two different storage types or failure domains, with at least one copy somewhere else.
+:::
+
+The classic **3-2-1 strategy** is the simplest useful starting point for backup design:
+
+- **3 copies of important data** — one production copy and two backup copies.
+- **2 different media or independent storage systems** — so one hardware/storage failure does not destroy every copy.
+- **1 copy off-site** — so theft, fire, flooding, electrical damage, or a catastrophic local event does not destroy the entire backup set.
+
+A practical homelab example:
+
+```text
+Copy 1: Live application data on the server
+Copy 2: Versioned Kopia snapshots on a local NAS
+Copy 3: Independent off-site backup or replicated critical data
+```
+
+Git can add another useful copy of **configuration**, but it does not replace backups of databases, documents, photos, or application state.
+
+### What counts as "different media" in a homelab?
+
+Do not get hung up on tape versus disk. The goal is **independent failure**.
+
+Better:
+
+```text
+Server NVMe → separate NAS → remote/off-site storage
+```
+
+Worse:
+
+```text
+/data/app
+/data/app-backup
+```
+
+Those two directories may still disappear together if the same filesystem, host, or storage controller fails.
+
+### A stronger modern version: 3-2-1-1-0
+
+For critical data, I like the extended idea:
+
+- **3** copies
+- **2** storage types/failure domains
+- **1** off-site copy
+- **1** offline, immutable, or otherwise protected copy where practical
+- **0** unverified backups—meaning restores are tested and backup errors are not ignored
+
+You do not need enterprise tape infrastructure to apply this. An off-site target with versioning/immutability controls plus routine restore tests already gets a homelab much closer to the intent.
+
+CISA/US-CERT guidance has long recommended the 3-2-1 rule for improving recoverability.
+
+**Reference:** [CISA/US-CERT Data Backup Options](https://www.cisa.gov/sites/default/files/publications/data_backup_options.pdf)
+
+---
+
+## 🛠️ Concrete Example: Protect a Docker Application
+
+:::tip[ELI5]
+For a Docker application, back up the data the container needs—not the container image itself. The image can usually be downloaded again; your database and uploaded files cannot.
+:::
+
+Imagine this stack:
+
+```text
+/opt/docker/stacks/app/compose.yaml
+/opt/docker/stacks/app/.env
+/opt/docker/data/app/config/
+/opt/docker/data/app/uploads/
+PostgreSQL database
+```
+
+A sensible protection plan is:
+
+1. Commit `compose.yaml`, `.env.example`, scripts, and README to Git.
+2. Keep the real `.env` in a password manager/protected secret backup—not a public repository.
+3. Create a scheduled PostgreSQL dump.
+4. Include the dump, `config/`, and `uploads/` in Kopia snapshots.
+5. Store the Kopia repository on a separate NAS/storage system.
+6. Replicate critical data or backups off-site.
+7. Quarterly, restore the app into a temporary directory or test stack and prove it starts.
+
+That is 3-2-1 translated into an actual homelab workflow.
+
+---
+
+## ✅ What You Need to Know First
+
+:::tip[ELI5]
+A green dashboard, a completed snapshot, or an intact RAID array is not proof of recoverability.
+:::
 
 > A backup is not successful because the job completed. It is successful because the data can be restored.
 
@@ -40,6 +154,10 @@ A useful backup system must provide:
 
 ## 🧱 Think in Layers, Not Products
 
+:::tip[ELI5]
+No single mechanism is ideal for all of these.
+:::
+
 A homelab typically contains several different kinds of state:
 
 | Layer | Examples | Best protection |
@@ -59,6 +177,10 @@ That is why a layered strategy is more resilient than trying to make one backup 
 ---
 
 ## 🧬 Git Protects Reproducibility, Not Runtime State
+
+:::tip[ELI5]
+This section explains how version control helps you review, reproduce, or recover infrastructure configuration.
+:::
 
 Infrastructure configuration belongs in Git whenever it can be safely represented there:
 
@@ -102,6 +224,10 @@ See [Git-Managed Homelab](/homelab/git-managed-homelab/) for the repository work
 ---
 
 ## 📦 Classify Data Before Backing It Up
+
+:::tip[ELI5]
+Before configuring retention, decide what each class of data is worth.
+:::
 
 Before configuring retention, decide what each class of data is worth.
 
@@ -161,6 +287,10 @@ These usually do not belong in a backup repository.
 
 ## 🗺️ The RebelRx Backup Model
 
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
 At a high level, the environment uses four complementary protections:
 
 ### 1. Git
@@ -185,6 +315,10 @@ This is intentionally not a byte-for-byte mirror of every system. Different data
 
 ## 🛡️ Why Kopia Works Well for the Local Backup Tier
 
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
 [Kopia](https://kopia.io/) is a strong fit for homelab backups because it provides:
 
 - Content-addressed deduplication
@@ -206,6 +340,10 @@ Backing a workstation onto another disk inside the same workstation is useful ag
 ---
 
 ## 🗄️ Keep Backup Repositories Separate from Live Data
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
 Whenever possible, the system being backed up and the repository receiving the backup should fail independently.
 
@@ -233,6 +371,10 @@ What matters is that a failed compute host does not also destroy its backup repo
 
 ## 🔒 Encryption Keys Are Part of the Backup
 
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
 Kopia repositories are encrypted. That is a major advantage—until the repository password is lost.
 
 Store repository credentials somewhere independent from the machine being backed up.
@@ -250,6 +392,10 @@ A perfectly healthy encrypted repository with a lost password is functionally eq
 ---
 
 ## 🧠 Back Up the Things That Take Time to Rebuild
+
+:::tip[ELI5]
+One of the easiest backup mistakes is focusing only on obvious personal files while ignoring infrastructure state that required significant effort to create.
+:::
 
 One of the easiest backup mistakes is focusing only on obvious personal files while ignoring infrastructure state that required significant effort to create.
 
@@ -272,6 +418,10 @@ A 50 GB directory that took two weeks to curate may be more valuable than a 5 TB
 ---
 
 ## 🤖 Treat AI Models as a Deliberate Backup Class
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
 Local AI systems introduce a new storage problem: models can be enormous.
 
@@ -299,6 +449,10 @@ In my environment, local AI assets are important enough that key model/data dire
 ---
 
 ## 🗃️ Databases Need Application-Consistent Backups
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
 Databases deserve special handling.
 
@@ -339,6 +493,10 @@ The important rule is:
 
 ## 🧪 Prefer Atomic Database Export Workflows
 
+:::tip[ELI5]
+Databases need deliberate handling because copying live database files is not always a safe backup or migration method.
+:::
+
 When automating database dumps, do not allow the backup system to capture a half-written export.
 
 A simple pattern is:
@@ -370,6 +528,10 @@ It does not see a partially written file with the final production name.
 
 ## 📆 Snapshot Frequency Should Follow Change Rate
 
+:::tip[ELI5]
+There is no universal correct backup interval.
+:::
+
 There is no universal correct backup interval.
 
 Think in terms of **Recovery Point Objective (RPO)**:
@@ -391,6 +553,10 @@ A six-hour snapshot interval may be entirely reasonable for important homelab st
 ---
 
 ## 🕰️ Retention Is About History, Not Just Copies
+
+:::tip[ELI5]
+A backup repository should protect against mistakes discovered later.
+:::
 
 A backup repository should protect against mistakes discovered later.
 
@@ -416,6 +582,10 @@ The exact numbers should reflect available capacity and how quickly corruption o
 
 ## 💽 RAID and ZFS Are Not Backups
 
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
 Redundant storage is useful. It is not backup.
 
 RAID/ZFS redundancy can help survive:
@@ -440,6 +610,10 @@ A replicated mistake is still a mistake.
 
 ## 🗂️ Separate Storage Pools Are Useful—but Still Local
 
+:::tip[ELI5]
+This section explains how to keep storage usable, observable, and recoverable as the homelab grows.
+:::
+
 Using multiple independent NAS pools is valuable because it avoids making every workload depend on one giant filesystem.
 
 Separate pools can provide:
@@ -456,6 +630,10 @@ That is why genuinely important data needs an off-site strategy as well.
 ---
 
 ## 🌍 Off-Site Protection Should Match the Data
+
+:::tip[ELI5]
+Off-site backups are expensive in three currencies: That is especially true for very large media/archive collections.
+:::
 
 Off-site backups are expensive in three currencies:
 
@@ -489,6 +667,10 @@ The important properties are:
 
 ## 📡 Know the Restore Bandwidth Before You Need It
 
+:::tip[ELI5]
+This section walks through getting data or a service back into a working state.
+:::
+
 Large backups introduce an uncomfortable reality: restoring tens or hundreds of terabytes over the internet may take a very long time.
 
 Approximate best-case transfer time can be estimated with:
@@ -515,6 +697,10 @@ That distinction should be documented before disaster strikes.
 
 ## 🧱 Back Up Application Data, Not Containers
 
+:::tip[ELI5]
+Containers are replaceable application instances; this section explains how to operate them without losing persistent state.
+:::
+
 Container images should generally be recreated from upstream registries.
 
 Back up:
@@ -534,6 +720,10 @@ Do not waste backup storage on container layers that Docker can pull again.
 ---
 
 ## 🐳 Know Which Docker Data Is Stateful
+
+:::tip[ELI5]
+This section explains how the Docker part of the setup should be configured or operated.
+:::
 
 A Compose project may look reproducible while hiding state in:
 
@@ -557,6 +747,10 @@ Named volumes require deliberate export or inclusion in the backup process.
 
 ## 🧾 Document Backup Coverage
 
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
 Maintain a simple coverage matrix.
 
 Example:
@@ -574,6 +768,10 @@ The exact topology can remain private. The important part is knowing whether an 
 ---
 
 ## 🩺 Monitor Backups for Absence of Success
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
 Backups often fail silently because of:
 
@@ -607,6 +805,10 @@ Useful signals include:
 
 ## 🔍 Verify Repository Health
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 Periodic repository verification should be part of routine maintenance.
 
 With Kopia, verification can include checking repository metadata and content integrity using the tools appropriate for the repository configuration.
@@ -618,6 +820,10 @@ Schedule deeper checks during low-activity periods.
 ---
 
 ## 🔁 Restore Testing Is Mandatory
+
+:::tip[ELI5]
+This section walks through getting data or a service back into a working state.
+:::
 
 Every backup class should be restored periodically.
 
@@ -667,6 +873,10 @@ This is the closest thing to proof that the backup architecture is real.
 
 ## 🧪 Test the Backup, Not Just the Restore Command
 
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
 A command returning exit code `0` proves only that the command did not report an error.
 
 After restoring, validate the actual data:
@@ -683,6 +893,10 @@ Recovery validation must be semantic, not merely mechanical.
 ---
 
 ## 📋 A Practical Quarterly Backup Drill
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
 A lightweight quarterly routine can be:
 
@@ -703,6 +917,10 @@ This should take far less time than recovering from an undocumented failure.
 ---
 
 ## 🚨 Protect Against Ransomware
+
+:::tip[ELI5]
+Versioned backups help, but only if an attacker cannot erase every version.
+:::
 
 Versioned backups help, but only if an attacker cannot erase every version.
 
@@ -727,6 +945,10 @@ No single feature replaces layered isolation.
 
 ## 🔑 Treat Secrets as Recoverable State
 
+:::tip[ELI5]
+This section is about keeping credentials private while still making the system recoverable.
+:::
+
 Secrets should not be in Git, but they still have to survive a host failure.
 
 Examples:
@@ -747,6 +969,10 @@ Do not make the recovery path depend on a service that itself requires the faile
 
 ## 🧯 Plan for Backup-System Failure Too
 
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
 Backup infrastructure can fail independently.
 
 Possible failures include:
@@ -765,6 +991,10 @@ Git, Kopia, local NAS storage, and off-site storage solve different problems and
 
 ## 🔄 Do Not Confuse Synchronization with Backup
 
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
 File synchronization tools are designed to propagate changes.
 
 That includes bad changes.
@@ -778,6 +1008,10 @@ Use versioned backups for recovery.
 ---
 
 ## 🧩 Backups Should Follow Dependencies
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
 A self-hosted application often depends on more than its own data directory.
 
@@ -801,6 +1035,10 @@ This is why infrastructure documentation and backups must be designed together.
 
 ## 🗃️ Keep Backup Tool Configuration Reproducible
 
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
 Where safe, keep non-secret backup configuration in Git:
 
 - Compose definition
@@ -820,6 +1058,10 @@ The backup system itself should be rebuildable after a host failure.
 ---
 
 ## ⚙️ Rebuild the OS; Restore the State
+
+:::tip[ELI5]
+This section walks through getting data or a service back into a working state.
+:::
 
 For most Linux homelab systems, I prefer not to rely on full-disk images as the primary recovery mechanism.
 
@@ -842,6 +1084,10 @@ It also proves that the documentation is sufficient to recreate the machine.
 
 ## 📚 Keep Recovery Documentation Outside the Failure Domain
 
+:::tip[ELI5]
+This section is about getting from a failure back to a verified working system.
+:::
+
 Do not store the only copy of the recovery guide on the server it describes.
 
 Keep an externally accessible or offline copy containing enough information to identify:
@@ -858,6 +1104,10 @@ Do not publish private network details or plaintext secrets in public documentat
 ---
 
 ## 🚫 Common Backup Mistakes
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
 Avoid these:
 
@@ -877,6 +1127,10 @@ Avoid these:
 ---
 
 ## ✅ Backup Architecture Checklist
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
 Before calling a system protected, confirm:
 
@@ -899,6 +1153,10 @@ Before calling a system protected, confirm:
 
 ## 🔗 Related Guides
 
+:::tip[ELI5]
+This section explains related guides in practical terms and what it changes in the homelab.
+:::
+
 - [Docker Infrastructure Standards](/homelab/docker-infrastructure-standards/)
 - [Git-Managed Homelab](/homelab/git-managed-homelab/)
 - [Disaster Recovery Runbook](/homelab/disaster-recovery/)
@@ -907,7 +1165,11 @@ Before calling a system protected, confirm:
 
 ---
 
-## 🧠 Final Principle
+## ✅ What to Remember
+
+:::tip[ELI5]
+This is the short version to keep in mind after you finish the page.
+:::
 
 A backup architecture is not measured by how many terabytes it stores.
 

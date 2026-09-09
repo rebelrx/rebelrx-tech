@@ -3,16 +3,73 @@ title: "🐳 Docker Infrastructure Standards"
 description: >-
   A practical standard for clean, reproducible Docker Compose homelabs: directory layout, stack structure, environment files, documentation, validation, secrets, updates, backups, and recovery.
 ---
+Once Docker is installed, the next challenge is keeping dozens of services understandable. This guide is the operating standard I use for that: predictable directories, one Compose definition per stack, safe environment-variable handling, useful README files, Git review, deliberate upgrades, and recoverable application data.
 
-A Docker homelab stays maintainable only when every stack follows the same operational rules.
+:::tip[ELI5]
+Docker runs the containers. **Docker Compose is the instruction sheet** that tells Docker which containers belong together, which ports they use, what storage they need, and which settings they receive. This page is about keeping those instruction sheets and their data organized so the homelab does not become a pile of one-off setups.
+:::
 
-This guide defines a recommended approach to **Docker infrastructure standard**: a Compose-first approach built around reproducible configuration, durable application data, detailed documentation, deliberate upgrades, and Git as the source of truth. You can choose to organize your infrastructure however you like; this is just a recommended path to stay consistent and easy to manage.
+## 🧩 What Docker Compose Is
 
-It complements the [Docker Homelab guide](/homelab/docker-home-lab/), which covers installing and operating Docker itself. This page focuses on **how individual stacks should be structured, documented, reviewed, deployed, upgraded, and recovered**.
+:::tip[ELI5]
+This section explains the saved configuration Docker uses to recreate the stack consistently.
+:::
+
+A Compose file is a human-readable YAML file—normally `compose.yaml`—that describes a complete application stack. Instead of typing a very long `docker run` command and trying to remember it later, you save the configuration as code.
+
+For example:
+
+```yaml
+name: example
+
+services:
+  app:
+    image: example/app:1.2.3
+    ports:
+      - "8080:8080"
+    volumes:
+      - /opt/docker/data/example:/config
+    restart: unless-stopped
+```
+
+Then you operate it with commands such as:
+
+```bash
+docker compose up -d
+docker compose ps
+docker compose logs -f
+docker compose down
+```
+
+The exact application changes; the workflow stays the same.
+
+## 🧭 How to Use This Page
+
+:::tip[ELI5]
+If you are building a new Docker host, work through the numbered sections in order.
+:::
+
+If you are building a new Docker host, work through the numbered sections in order. If you already have a working homelab, use them as an audit checklist and adopt improvements gradually rather than rewriting everything at once.
+
+The desired end state is simple:
+
+```text
+Git-managed stack definition
+        +
+local secrets (.env)
+        +
+separate persistent application data
+        ↓
+reproducible Docker stack
+```
 
 ---
 
-## ⚠️ Core Philosophy
+## ✅ What You Need to Know First
+
+:::tip[ELI5]
+Those three categories should remain separate.
+:::
 
 > Containers are disposable. Configuration is reproducible. Data is durable.
 
@@ -32,6 +89,10 @@ If a service exists only because someone clicked through a GUI once, it is not y
 ---
 
 ## 📁 1. Standard Directory Layout
+
+:::tip[ELI5]
+This section is about where files should live so you can find, back up, and rebuild them consistently.
+:::
 
 Use separate trees for **stack definitions** and **persistent application data**:
 
@@ -93,6 +154,10 @@ Keeping configuration and data separate makes backup policy, restores, migration
 
 ## 🧱 2. One Directory Per Operational Stack
 
+:::tip[ELI5]
+This section is about where files should live so you can find, back up, and rebuild them consistently.
+:::
+
 Each independently managed application belongs in its own directory:
 
 ```text
@@ -122,6 +187,10 @@ Avoid creating artificial separation merely because a Compose file contains mult
 ---
 
 ## 📄 3. Use `compose.yaml`
+
+:::tip[ELI5]
+This section explains the saved configuration Docker uses to recreate the stack consistently.
+:::
 
 Use one filename consistently:
 
@@ -155,6 +224,10 @@ A predictable filename simplifies:
 
 ## 🏷️ 4. Give Every Stack a Stable Project Name
 
+:::tip[ELI5]
+Use a top-level Compose `name:`: This makes the Compose project identity explicit instead of relying on whatever directory name happens to contain the file.
+:::
+
 Use a top-level Compose `name:`:
 
 ```yaml
@@ -184,6 +257,10 @@ Do not rename mature stacks casually. A project-name change can create new netwo
 ---
 
 ## 📛 5. Container Names: Be Consistent, Not Dogmatic
+
+:::tip[ELI5]
+Containers are replaceable application instances; this section explains how to operate them without losing persistent state.
+:::
 
 Explicit container names are acceptable when a stable name is operationally useful:
 
@@ -216,6 +293,10 @@ Do not churn known-good Compose wiring purely to satisfy stylistic preferences.
 ---
 
 ## 🧾 6. `.env.example` Is Part of the Documentation
+
+:::tip[ELI5]
+This section explains how to keep configurable values documented while keeping real secrets out of Git.
+:::
 
 Every stack that uses environment variables should include:
 
@@ -304,6 +385,10 @@ This avoids one of the most common sources of configuration confusion: a variabl
 
 ## 🔄 7. Keep `.env.example`, `compose.yaml`, and README in Sync
 
+:::tip[ELI5]
+This section explains the saved configuration Docker uses to recreate the stack consistently.
+:::
+
 Configuration drift is one of the easiest ways to make an otherwise clean repository unreliable.
 
 When adding, renaming, or removing an environment variable, review all three files:
@@ -326,6 +411,10 @@ Treat those three files as a single interface.
 ---
 
 ## 🔐 8. Secrets Never Belong in Git
+
+:::tip[ELI5]
+This section is about keeping credentials private while still making the system recoverable.
+:::
 
 Do not commit:
 
@@ -366,6 +455,10 @@ If a real secret is committed, removing it from the latest file is not enough. A
 ---
 
 ## 🧩 9. Standard Compose Structure
+
+:::tip[ELI5]
+This section explains the saved configuration Docker uses to recreate the stack consistently.
+:::
 
 A simple stack should be easy to scan from top to bottom.
 
@@ -410,6 +503,10 @@ Exact ordering is less important than **repository-wide consistency**.
 
 ## 🛠️ 10. Preserve Known-Good Wiring
 
+:::tip[ELI5]
+Do not rewrite a working Compose file merely because another syntax is newer, shorter, or more fashionable.
+:::
+
 Do not rewrite a working Compose file merely because another syntax is newer, shorter, or more fashionable.
 
 Examples of things that may be deliberate:
@@ -429,6 +526,10 @@ This is especially important when auditing many stacks at once. Large cosmetic r
 ---
 
 ## 🏷️ 11. Image Tags: Pin Deliberately
+
+:::tip[ELI5]
+Choose an update model intentionally.
+:::
 
 Choose an update model intentionally.
 
@@ -483,6 +584,10 @@ There is no universal tag strategy. The problem is **unintentional** upgrade beh
 
 ## 🔁 12. Restart Policies
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 For normal long-running services:
 
 ```yaml
@@ -504,6 +609,10 @@ A one-time job that restarts forever is not resilience; it is a configuration er
 ---
 
 ## ❤️ 13. Healthchecks Should Test Something Real
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
 
 A container being `running` does not mean its application is usable.
 
@@ -531,6 +640,10 @@ Avoid healthchecks that exist only to make a dashboard green.
 
 ## ⏳ 14. `depends_on` Does Not Automatically Mean "Ready"
 
+:::tip[ELI5]
+means Compose starts the dependency first.
+:::
+
 Basic start ordering:
 
 ```yaml
@@ -553,6 +666,10 @@ The dependency must actually define a valid healthcheck.
 ---
 
 ## 💾 15. Persistent Storage
+
+:::tip[ELI5]
+This section explains how to keep storage usable, observable, and recoverable as the homelab grows.
+:::
 
 Prefer explicit host paths for application data you administer directly:
 
@@ -583,6 +700,10 @@ Keep latency-sensitive or locking-sensitive application state local when require
 
 ## 🗄️ 16. Treat Network Storage as a Dependency
 
+:::tip[ELI5]
+This section explains how to keep storage usable, observable, and recoverable as the homelab grows.
+:::
+
 If a stack relies on NFS or another remote filesystem, document that dependency.
 
 The README should state:
@@ -609,6 +730,10 @@ Use generic documented mount roles in public repositories rather than exposing p
 
 ## 🚪 17. Publish Only the Ports You Need
 
+:::tip[ELI5]
+Do not expose a host port merely because the upstream example does.
+:::
+
 Do not expose a host port merely because the upstream example does.
 
 For every published port, decide whether the service should be reachable from:
@@ -633,6 +758,10 @@ If two containers only communicate with one another, they usually do not need ho
 ---
 
 ## 🕸️ 18. Use Compose Networks for Internal Communication
+
+:::tip[ELI5]
+This section explains the saved configuration Docker uses to recreate the stack consistently.
+:::
 
 Containers in the same Compose network can communicate using service names:
 
@@ -661,6 +790,10 @@ This keeps stacks portable between Docker hosts.
 
 ## 🌐 19. External Networks Should Be Explicit
 
+:::tip[ELI5]
+This section covers a network dependency or boundary you should understand before adding more complexity.
+:::
+
 Some environments use shared reverse-proxy or infrastructure networks.
 
 If a stack attaches to one, document it clearly:
@@ -678,6 +811,10 @@ Create shared infrastructure deliberately rather than relying on undocumented ho
 ---
 
 ## 🔑 20. Environment Variables vs Compose Secrets
+
+:::tip[ELI5]
+This section explains the saved configuration Docker uses to recreate the stack consistently.
+:::
 
 `.env` files are practical for homelabs, but they are not encrypted secret stores.
 
@@ -700,6 +837,10 @@ Regardless of mechanism:
 ---
 
 ## 🧠 21. GPU Workloads Must Be Explicit
+
+:::tip[ELI5]
+This section focuses on the GPU-specific measurements or decisions that matter for local AI workloads.
+:::
 
 On GPU hosts, document accelerator requirements rather than assuming future-you will remember them.
 
@@ -732,6 +873,10 @@ See [Self-Hosted AI](/homelab/self-hosted-ai/) for the broader architecture.
 
 ## 📊 22. Resource Limits Are a Tool, Not a Requirement
 
+:::tip[ELI5]
+Do not add CPU and memory limits to every service simply because Compose supports them.
+:::
+
 Do not add CPU and memory limits to every service simply because Compose supports them.
 
 Limits make sense when:
@@ -748,6 +893,10 @@ They are not a substitute for monitoring or understanding workload behavior.
 
 ## 📚 23. README Files Should Be Operational Manuals
 
+:::tip[ELI5]
+Every stack should have a detailed `README.md`.
+:::
+
 Every stack should have a detailed `README.md`.
 
 A one-paragraph description and a `docker compose up -d` command are not sufficient for infrastructure you may need to recover later.
@@ -761,45 +910,89 @@ Short description of the stack and its purpose.
 
 ## Overview
 
+:::tip[ELI5]
+What it does, where it fits, and any important design decisions.
+:::
+
 What it does, where it fits, and any important design decisions.
 
 ## Services
+
+:::tip[ELI5]
+Containers included in the stack and their roles.
+:::
 
 Containers included in the stack and their roles.
 
 ## Prerequisites
 
+:::tip[ELI5]
+Required storage, networks, devices, accounts, directories, or host configuration.
+:::
+
 Required storage, networks, devices, accounts, directories, or host configuration.
 
 ## Directory Layout
+
+:::tip[ELI5]
+This section is about where files should live so you can find, back up, and rebuild them consistently.
+:::
 
 Persistent paths and stack files.
 
 ## Environment Configuration
 
+:::tip[ELI5]
+Variables the operator must review.
+:::
+
 Variables the operator must review.
 
 ## Networking
+
+:::tip[ELI5]
+This section covers a network dependency or boundary you should understand before adding more complexity.
+:::
 
 Published ports, internal service communication, reverse-proxy requirements, or external networks.
 
 ## Deployment
 
+:::tip[ELI5]
+Exact setup and startup commands.
+:::
+
 Exact setup and startup commands.
 
 ## Validation
+
+:::tip[ELI5]
+Commands or health checks that confirm successful deployment.
+:::
 
 Commands or health checks that confirm successful deployment.
 
 ## Updates
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 Safe upgrade procedure and version-specific cautions.
 
 ## Backup and Restore
 
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
+
 What must be protected and how the service is recovered.
 
 ## Troubleshooting / Notes
+
+:::tip[ELI5]
+Work through these checks in order so you isolate the failing layer instead of changing several things at once.
+:::
 
 Known application-specific issues, exceptions, or non-obvious behavior.
 ```
@@ -824,6 +1017,10 @@ A README should be detailed enough that **future-you can recover the application
 ---
 
 ## 📝 24. Document Exceptions Instead of "Fixing" Them
+
+:::tip[ELI5]
+Real infrastructure accumulates exceptions for legitimate reasons.
+:::
 
 Real infrastructure accumulates exceptions for legitimate reasons.
 
@@ -850,6 +1047,10 @@ A documented exception is maintainable. An unexplained workaround becomes techni
 ---
 
 ## ✅ 25. Validate Compose Before Deployment
+
+:::tip[ELI5]
+This section explains the saved configuration Docker uses to recreate the stack consistently.
+:::
 
 Validate without printing resolved secrets when only a pass/fail result is needed:
 
@@ -878,6 +1079,10 @@ Do not assume a YAML file is valid because it looks correct in an editor.
 ---
 
 ## 🧪 26. Repository-Wide Pre-Commit Validation
+
+:::tip[ELI5]
+A stack repository should automatically catch common mistakes before commit.
+:::
 
 A stack repository should automatically catch common mistakes before commit.
 
@@ -932,6 +1137,10 @@ If a hook modifies a file, review the change, stage it again, and rerun validati
 
 ## ↩️ 27. Enforce Predictable Line Endings
 
+:::tip[ELI5]
+Infrastructure repositories often move between Linux, Windows, and editors with different defaults.
+:::
+
 Infrastructure repositories often move between Linux, Windows, and editors with different defaults.
 
 A simple `.gitattributes` baseline can keep text files consistent:
@@ -945,6 +1154,10 @@ This prevents meaningless CRLF/LF churn in Compose files, scripts, environment e
 ---
 
 ## 🔎 28. Review Changes Before Staging
+
+:::tip[ELI5]
+The second check is especially important for infrastructure repositories because a single accidental secret, port change, or volume-path typo can have real consequences.
+:::
 
 Before committing:
 
@@ -969,6 +1182,10 @@ The second check is especially important for infrastructure repositories because
 ---
 
 ## 🌿 29. Standard Git Change Workflow
+
+:::tip[ELI5]
+This section explains how version control helps you review, reproduce, or recover infrastructure configuration.
+:::
 
 A disciplined change sequence looks like:
 
@@ -997,6 +1214,10 @@ See [Git-Managed Homelab](/homelab/git-managed-homelab/) for the complete reposi
 ---
 
 ## 🚀 30. Deployment Workflow
+
+:::tip[ELI5]
+For a new stack, do not call the deployment complete merely because the container started.
+:::
 
 For a new or changed stack:
 
@@ -1040,6 +1261,10 @@ For a new stack, do not call the deployment complete merely because the containe
 
 ## ⬆️ 31. Upgrade Workflow
 
+:::tip[ELI5]
+10. Review logs for migration or startup errors.
+:::
+
 A normal update should be deliberate:
 
 ```bash
@@ -1071,6 +1296,10 @@ If an application performs irreversible schema migrations, simply restoring the 
 
 ## 🛑 32. Do Not Blindly Auto-Update Production Services
 
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
 Automatic image updaters are convenient, but they remove the review window where you would normally:
 
 - Read release notes
@@ -1089,6 +1318,10 @@ For important stateful services, manual or approval-based upgrades remain the sa
 ---
 
 ## 💾 33. Back Up State, Not Container Images
+
+:::tip[ELI5]
+Containers are replaceable application instances; this section explains how to operate them without losing persistent state.
+:::
 
 Container images can normally be downloaded again.
 
@@ -1109,6 +1342,10 @@ Do not waste backup capacity protecting replaceable image layers unless you have
 ---
 
 ## 🛡️ 34. Git and Backups Protect Different Things
+
+:::tip[ELI5]
+This section explains what should be protected and how to make sure it can actually be restored.
+:::
 
 Git protects **declarative configuration**:
 
@@ -1140,6 +1377,10 @@ A backup of runtime data without Compose definitions and documentation can be eq
 
 ## 🧭 35. Define What Must Be Recreated vs Restored
 
+:::tip[ELI5]
+This section walks through getting data or a service back into a working state.
+:::
+
 Every stack should fall into one of three broad categories.
 
 ### Recreate only
@@ -1168,6 +1409,10 @@ The README should make that distinction clear.
 
 ## ♻️ 36. Restore Procedures Are Part of the Stack
 
+:::tip[ELI5]
+This section walks through getting data or a service back into a working state.
+:::
+
 "This directory is backed up" is not a restore plan.
 
 A README should document the order required to recover a stateful application.
@@ -1190,6 +1435,10 @@ Where ordering matters, write it down.
 ---
 
 ## 🔒 37. Avoid Host-Specific Information in Public Repositories
+
+:::tip[ELI5]
+Public documentation should explain architecture without publishing unnecessary private infrastructure details.
+:::
 
 Public documentation should explain architecture without publishing unnecessary private infrastructure details.
 
@@ -1220,6 +1469,10 @@ The goal is to teach the pattern without creating an inventory of your private n
 
 ## 📦 38. Keep Public Examples Portable
 
+:::tip[ELI5]
+A public stack example should usually be understandable without owning your exact hardware.
+:::
+
 A public stack example should usually be understandable without owning your exact hardware.
 
 Prefer:
@@ -1238,6 +1491,10 @@ This also makes the documentation more useful to other readers.
 
 ## 📖 39. Repository Root README
 
+:::tip[ELI5]
+A multi-stack repository should also have a detailed root README.
+:::
+
 A multi-stack repository should also have a detailed root README.
 
 It should explain:
@@ -1250,7 +1507,7 @@ It should explain:
 - Git/security rules
 - Validation commands
 - Update workflow
-- Backup philosophy
+- Backup approach
 - Any repository-wide naming standards
 
 Example layout:
@@ -1275,6 +1532,10 @@ Individual stack READMEs explain **how each service works**.
 ---
 
 ## ☑️ 40. New Stack Checklist
+
+:::tip[ELI5]
+Use this as a final verification pass after the main setup is working.
+:::
 
 Before considering a new stack finished, verify:
 
@@ -1305,6 +1566,10 @@ Before considering a new stack finished, verify:
 ---
 
 ## 🔍 41. Existing Stack Audit Checklist
+
+:::tip[ELI5]
+Use this as a final verification pass after the main setup is working.
+:::
 
 When reviewing an older repository for drift, check each stack for:
 
@@ -1358,6 +1623,10 @@ This is the standard to use when a repository has accumulated several months or 
 
 ## 🚫 42. What Not to Standardize
 
+:::tip[ELI5]
+Standardization is useful until it starts overriding application reality.
+:::
+
 Standardization is useful until it starts overriding application reality.
 
 Do **not** force every stack to have identical:
@@ -1385,7 +1654,11 @@ Let application-specific requirements remain application-specific.
 
 ---
 
-## 🧠 Final Principle
+## ✅ What to Remember
+
+:::tip[ELI5]
+This is the short version to keep in mind after you finish the page.
+:::
 
 A Compose stack should be understandable without opening a running container, inspecting undocumented Docker state, or relying on the memory of the person who created it.
 

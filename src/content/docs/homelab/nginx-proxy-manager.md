@@ -3,19 +3,56 @@ title: "🔀 Nginx Proxy Manager (Private HTTPS for Everything)"
 description: >-
   Nginx Proxy Manager for a private homelab — clean HTTPS names for every service, wildcard certificates with zero exposed ports via DNS-01, and local DNS with AdGuard Home.
 ---
-Ports and IP addresses don't scale. While `http://192.0.2.20:8096` may work for one service; by service ten it's a memory game, every browser screams "Not Secure," and nothing has TLS.
+A **reverse proxy** sits in front of web applications and gives them friendly HTTPS names. Instead of remembering `http://server-ip:8096`, you can browse to something like `https://media.home.example.com`. The proxy receives the browser request, looks at the hostname, and forwards it to the correct internal application.
 
-A reverse proxy fixes this: **one entry point, real HTTPS, clean names** — `https://jellyfin.home.example.com` — without exposing a single port to the internet.
+**Nginx Proxy Manager (NPM)** provides a web interface for configuring that routing and managing TLS certificates without hand-writing Nginx configuration for every service.
+
+:::tip[ELI5]
+A reverse proxy is the receptionist for your web apps. Everyone comes to one front desk using a friendly name, and the receptionist sends each request to the right internal service.
+:::
+
+## 🪜 What You Will Configure
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
+
+1. Run Nginx Proxy Manager with Docker Compose.
+2. Put NPM and proxied applications on a shared Docker network.
+3. Obtain a certificate, preferably with DNS validation when you do not want inbound public ports.
+4. Create local DNS records that point friendly names at the proxy.
+5. Add one proxy host per application.
+6. Verify HTTPS and then remove unnecessary directly published application ports.
+
+## 🧩 Reverse-Proxy Terms You Should Know
+
+:::tip[ELI5]
+This section explains how one front-end service can route friendly web names to the correct internal application.
+:::
+
+- **Reverse proxy** — a server that accepts a request and forwards it to the correct backend application.
+- **TLS/HTTPS certificate** — the cryptographic identity used to provide trusted HTTPS.
+- **DNS-01 challenge** — a way to prove domain ownership through DNS instead of opening port 80.
+- **Wildcard certificate** — a certificate that can cover many names under one domain, such as `*.home.example.com`.
+- **Backend / upstream application** — the internal service NPM forwards traffic to.
 
 ---
 
-## ⚠️ Core Principle
+## ✅ What You Need to Know First
+
+:::tip[ELI5]
+This section explains what you need to know first in practical terms and what it changes in the homelab.
+:::
 
 > Every service gets a name and a certificate. Nothing gets a port number in the address bar.
 
 ---
 
 ## 🧭 How the Pieces Fit
+
+:::tip[ELI5]
+This section explains how the pieces fit in practical terms and what it changes in the homelab.
+:::
 
 ```text
 Browser (on the Tailscale tailnet)
@@ -40,7 +77,61 @@ Three components:
 
 ---
 
+## 🌐 Choose a Domain Registrar
+
+:::tip[ELI5]
+You need a real domain name so browsers can trust the HTTPS certificates NPM creates. The registrar is simply the company where you buy and renew that domain. You can keep the domain completely private and still use it for internal homelab names.
+:::
+
+For a homelab, I would keep the registrar choice boring: use a reputable company with strong account security, predictable renewal pricing, DNSSEC support, and no junk upsells.
+
+### My short list
+
+| Registrar | Best for | Why I would choose it | Trade-offs |
+| :--- | :--- | :--- | :--- |
+| **Cloudflare Registrar** | Best overall if you already use Cloudflare DNS | Domains are sold and renewed at registry/ICANN cost, WHOIS is redacted by default, DNSSEC is simple, and Cloudflare DNS integrates perfectly with DNS-01 certificates | Domains registered there must use Cloudflare authoritative DNS |
+| **Porkbun** | Best independent registrar | Excellent reputation, transparent pricing, free WHOIS privacy on supported TLDs, DNSSEC, and a very clean domain-management experience | Fewer integrated infrastructure products than Cloudflare |
+| **Hostinger** | Good all-in-one alternative | Reputable mainstream provider, free WHOIS privacy on supported TLDs, straightforward management, and convenient if you already use Hostinger | I prefer Cloudflare or Porkbun when the domain is primarily infrastructure rather than web hosting |
+
+**My default recommendation is Cloudflare Registrar** for a homelab, particularly when you plan to use Cloudflare DNS API tokens for Let's Encrypt DNS-01 validation. **Porkbun is my favorite alternative** if you want the registrar and DNS provider to remain independent.
+
+I would **not** choose a registrar because the first-year price is $1 cheaper. Renewal cost, account security, API support, transfer policies, and management quality matter much more over the life of a domain.
+
+> I intentionally do not recommend GoDaddy. There are better registrars with cleaner pricing and less aggressive upselling.
+
+### What domain should you buy?
+
+You do **not** need a special "homelab" TLD. Buy a normal domain you are comfortable keeping for years, for example:
+
+```text
+example.net
+```
+
+Then reserve a subdomain for private services:
+
+```text
+home.example.net
+```
+
+Your internal services can then become:
+
+```text
+media.home.example.net
+files.home.example.net
+photos.home.example.net
+```
+
+The public internet does not need to point those names at your home. Local DNS can answer them privately, while DNS-01 validation proves domain ownership through the registrar/DNS provider's API.
+
+**References:** [Cloudflare Registrar](https://developers.cloudflare.com/registrar/), [Porkbun](https://porkbun.com/), [Hostinger WHOIS privacy](https://www.hostinger.com/support/1583419-whois-privacy-protection-at-hostinger/)
+
+---
+
 ## 📦 The NPM Stack
+
+:::tip[ELI5]
+Following the [homelab structure](/homelab/docker-home-lab/), `/opt/docker/stacks/npm/compose.yaml`: Create the stack directory and save the Compose file there.
+:::
 
 Following the [homelab structure](/homelab/docker-home-lab/), `/opt/docker/stacks/npm/compose.yaml`:
 
@@ -112,6 +203,10 @@ Complete the first-run account setup for your chosen release. Older releases use
 
 ## 🕸️ The Shared Proxy Network
 
+:::tip[ELI5]
+This section explains how one front-end service can route friendly web names to the correct internal application.
+:::
+
 NPM routes to containers **by name over a shared Docker network** — no published ports needed on the services themselves.
 
 Add the `proxy` network to any stack NPM should reach:
@@ -136,6 +231,10 @@ Now NPM can reach `jellyfin:8096` directly, and you can **remove the service's p
 ---
 
 ## 🔐 Wildcard Certificate with Zero Exposed Ports (DNS-01)
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 The usual Let's Encrypt flow (HTTP-01) requires port 80 open to the internet which we try to avoid. The **DNS-01 challenge** proves domain ownership through a DNS record instead, so issuance needs no inbound public port. DNS, ACME, and provider API access still require outbound connectivity. Bonus: it's the only challenge type that can issue **wildcard** certs.
 
@@ -164,6 +263,10 @@ A wildcard avoids listing every service name in the certificate. The wildcard an
 
 ## 🧭 Local DNS with AdGuard Home
 
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
+
 The internet has no idea what `jellyfin.home.example.com` is — only your network should. In AdGuard Home:
 
 **Filters → DNS rewrites → Add DNS rewrite**
@@ -181,6 +284,10 @@ A Tailscale address works only for clients with a permitted tailnet path. Ordina
 ---
 
 ## 🔀 Creating Proxy Hosts
+
+:::tip[ELI5]
+This section explains how one front-end service can route friendly web names to the correct internal application.
+:::
 
 The per-service payoff. **Hosts → Proxy Hosts → Add Proxy Host**:
 
@@ -223,6 +330,10 @@ is maddeningly vague — pages load but nothing updates. Enable it for applicati
 
 ## 🛡️ Hardening Checklist
 
+:::tip[ELI5]
+Use this as a final verification pass after the main setup is working.
+:::
+
 - Admin UI bound to `127.0.0.1`, reached through the SSH tunnel over [Tailscale](/homelab/tailscale/)
 - **Force SSL** on every proxy host; add **HSTS** once you're confident in the cert renewal
 - **Block Common Exploits** enabled per host
@@ -234,6 +345,10 @@ is maddeningly vague — pages load but nothing updates. Enable it for applicati
 
 ## 🧰 Troubleshooting
 
+:::tip[ELI5]
+Work through these checks in order so you isolate the failing layer instead of changing several things at once.
+:::
+
 - **502 Bad Gateway** → NPM can't reach the target. Is the service on the `proxy` network? Is the forward hostname the exact **container name**? Is the port the *internal* one (container's own port, not a published mapping)?
 - **DNS challenge fails** → API token scope wrong, or propagation lag — retry once, then re-check the token permissions. NPM's logs (`docker logs nginx-proxy-manager`) show certbot's actual error.
 - **Name doesn't resolve** → the client isn't using AdGuard for DNS. Check which resolver the device actually uses (`nslookup jellyfin.home.example.com`); phones on cellular need the Tailscale DNS setup above.
@@ -244,6 +359,10 @@ is maddeningly vague — pages load but nothing updates. Enable it for applicati
 
 ## 🚫 What Not To Do
 
+:::tip[ELI5]
+This section explains what not to do in practical terms and what it changes in the homelab.
+:::
+
 - Don't forward ports 80/443 on your router "just to make certs easier": DNS-01 exists precisely so you don't have to
 - Don't use `.local`, `.lan`, or a made-up TLD — you'll fight mDNS conflicts and can never get real certificates; a real domain costs less than a coffee per month
 - Don't expose the admin UI (`:81`) beyond localhost/Tailscale
@@ -251,7 +370,11 @@ is maddeningly vague — pages load but nothing updates. Enable it for applicati
 
 ---
 
-## 🧠 Final Thought
+## ✅ What to Remember
+
+:::tip[ELI5]
+This is the short version to keep in mind after you finish the page.
+:::
 
 The reverse proxy is where a pile of containers starts feeling like **infrastructure**: named, encrypted, consistent, reachable the same way from your couch or another continent.
 

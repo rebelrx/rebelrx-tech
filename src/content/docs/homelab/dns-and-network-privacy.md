@@ -3,31 +3,352 @@ title: "🛡️ DNS & Network Privacy"
 description: >-
   Build a resilient, privacy-focused home network with local DNS filtering, redundant resolvers, encrypted upstream DNS, device segmentation, Tailscale, and minimal public exposure.
 ---
-A privacy-respecting home network is not built around one magic appliance. It is built from **several simple controls that reinforce each other**:
+**DNS (Domain Name System)** is the lookup service that turns names such as `example.com` into the IP addresses computers actually use. Without DNS, you would have to remember numeric addresses for websites and services instead of names.
 
-- Local DNS filtering
-- Redundant resolvers
-- Deliberate upstream DNS
-- Segmentation for lower-trust devices
-- Private remote access
-- Minimal public exposure
-- Endpoint and browser privacy controls
+That lookup step also gives you a useful control point. A DNS filtering server such as **AdGuard Home** or **Pi-hole** can refuse to resolve known advertising, tracking, telemetry, phishing, or malware domains before a device connects to them. Because the filtering happens on your network, it can protect TVs, phones, tablets, game consoles, appliances, and other devices that cannot run a browser extension.
 
-DNS filtering is an excellent foundation because it protects devices that cannot run browser extensions or privacy software themselves. But it is still only **one layer**.
+:::tip[ELI5]
+DNS is the internet's contact list. A DNS blocker is a contact list that can also say, “do not give this device the address for that tracker.” The basic setup is: run a DNS blocker, make your router hand its address to clients, then verify your devices are actually using it.
+:::
+
+## 🪜 Quick Start: Get Network-Wide DNS Filtering Working
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
+
+You can improve the design later. First, get a simple setup working end to end.
+
+1. **Choose a DNS blocker.** AdGuard Home and Pi-hole are both good choices. Start with one if this is your first setup.
+2. **Give it a stable address.** Use a static IP or DHCP reservation so its address does not change.
+3. **Choose an upstream DNS resolver.** This is the DNS service your blocker asks when a domain is not blocked.
+4. **Test the blocker directly.** From another computer, query the blocker before changing your whole network.
+5. **Configure DHCP/router DNS.** Tell your router to advertise the blocker's address to clients.
+6. **Renew a client's network lease or reconnect it.** Then verify that the client is actually using the local resolver.
+7. **Check the query log.** Confirm requests from the client appear and blocked domains are being refused.
+8. **Add a second resolver only after the first works.** Redundancy is useful, but both advertised resolvers should normally apply the same filtering policy.
+9. **Add blocklists slowly.** Start with well-maintained lists and add exceptions only when you understand what broke.
+10. **Back up the configuration and test failure.** Shut down the primary resolver and confirm you know what happens.
+
+A first-time user can stop there with a functional network-wide blocker. The rest of this page explains how to make that setup more resilient, private, and easier to troubleshoot.
+
+## 🧩 DNS Terms You Should Know
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
+
+- **DNS resolver** — the server your device asks to look up a domain name.
+- **Upstream resolver** — the next DNS service your local blocker asks when it needs an answer.
+- **DHCP** — the service that automatically gives devices their IP address, gateway, and usually DNS settings.
+- **DNS filter / sinkhole** — a resolver that blocks selected domains instead of returning their normal address.
+- **Primary/secondary DNS** — two resolvers a client may use; “secondary” does not necessarily mean “only if primary fails.”
+- **DNS-over-HTTPS (DoH) / DNS-over-TLS (DoT)** — encrypted ways of sending DNS queries.
+- **DNSSEC** — validation that helps detect forged DNS answers for signed domains.
+- **Local DNS** — private names you define for devices or services inside your own network.
 
 ---
 
-## 🌐 What is DNS
+## 🛠️ Recommended Setup: AdGuard Home Primary + Pi-hole Secondary
 
-DNS stands for Domain Name System. It is the communication protocol that serves as the "phonebook" for the Internet and world wide web. DNS translates machine-readable, web IP addresses (e.g., 142.250.72.14) into human-readable domain names (e.g., www.google.com). 
+:::tip[ELI5]
+Run two DNS blockers on two different machines. Your router gives both addresses to every device. If one server is rebooting or unavailable, DNS still works—and both servers continue blocking ads, trackers, and malicious domains.
+:::
 
-Every device and website connected to the internet has it's own IP address on a server/network. If someone wants to access that device or page, it requires a system to access and retrieve that device, much like a library. In order to make the web more friendly for users, DNS translates an easy to remember hostname (e.g., www.example.com) to the actual device or site IP (e.g., 192.168.1.1). This is an oversimplification of DNS, as there are many backend steps required with different DNS servers, but this is essentially how DNS resolves sites for users to access websites both on external and internal networks.
+This is the setup I recommend for a homelab:
 
-> DNS is an essential component of Internet functionality, enabling web browsers to load internet resources by resolving the address entered by the user into the correct destination for data retrieval.
+```text
+Clients
+  │
+  ├── Primary DNS: AdGuard Home
+  │       └── Upstream: Quad9
+  │
+  └── Secondary DNS: Pi-hole
+          └── Upstream: Quad9
+```
+
+Use **two different hosts** if possible. Two containers on the same physical server do not protect you from that server failing.
+
+### Step 1 — Pick stable addresses
+
+Give both DNS hosts a static address or DHCP reservation. Example only:
+
+```text
+AdGuard Home   192.168.1.10
+Pi-hole        192.168.1.11
+```
+
+Do not copy those addresses blindly. Use addresses that fit your own LAN.
+
+### Step 2 — Deploy AdGuard Home
+
+If you already run Docker, this is the cleanest path:
+
+```yaml
+name: adguardhome
+
+services:
+  adguardhome:
+    image: adguard/adguardhome:latest
+    container_name: adguardhome
+    restart: unless-stopped
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "80:80/tcp"
+      - "3000:3000/tcp"
+    volumes:
+      - ./work:/opt/adguardhome/work
+      - ./conf:/opt/adguardhome/conf
+```
+
+Before starting it, confirm nothing else is already listening on DNS port 53:
+
+```bash
+sudo ss -lntup | grep ':53 '
+```
+
+If another local resolver already owns port 53, resolve that conflict first rather than changing AdGuard to a random DNS port; normal clients expect DNS on port 53.
+
+Start it:
+
+```bash
+mkdir -p ~/docker/adguardhome
+cd ~/docker/adguardhome
+nano compose.yaml
+
+docker compose up -d
+docker compose ps
+```
+
+Open the setup wizard in a browser:
+
+```text
+http://<ADGUARD-IP>:3000
+```
+
+During setup:
+
+1. Keep DNS listening on port `53`.
+2. Create a strong administrator password.
+3. Under **Settings → DNS settings**, configure your upstream resolver.
+4. For my preferred security-first setup, use Quad9:
+
+```text
+9.9.9.9
+149.112.112.112
+```
+
+5. Leave the default AdGuard filter lists enabled initially. Do not add twenty community lists on day one.
+
+Verify directly from another machine:
+
+```bash
+nslookup example.com <ADGUARD-IP>
+```
+
+or on Linux:
+
+```bash
+dig @<ADGUARD-IP> example.com
+```
+
+Then open **Query Log** in AdGuard Home and confirm the request appears.
+
+### Step 3 — Deploy Pi-hole on a second host
+
+A simple Docker Compose deployment:
+
+```yaml
+name: pihole
+
+services:
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "80:80/tcp"
+    environment:
+      TZ: America/New_York
+      FTLCONF_webserver_api_password: "CHANGE-ME"
+      FTLCONF_dns_listeningMode: "ALL"
+    volumes:
+      - ./etc-pihole:/etc/pihole
+```
+
+Start it:
+
+```bash
+mkdir -p ~/docker/pihole
+cd ~/docker/pihole
+nano compose.yaml
+
+docker compose up -d
+docker compose ps
+```
+
+Open:
+
+```text
+http://<PIHOLE-IP>/admin
+```
+
+Then configure **Settings → DNS** and select/customize the same upstream policy you use on AdGuard Home. For consistency, I recommend Quad9 on both.
+
+Test it directly:
+
+```bash
+dig @<PIHOLE-IP> example.com
+```
+
+### Step 4 — Tell your router to use both
+
+In your router's **LAN / DHCP / DNS** settings, advertise:
+
+```text
+Primary DNS:   <ADGUARD-IP>
+Secondary DNS: <PIHOLE-IP>
+```
+
+The exact menu name varies by router. You are looking for the DNS addresses distributed to LAN clients by DHCP—not merely the router's own WAN DNS setting.
+
+After changing it, reconnect a test device or renew its DHCP lease.
+
+On Debian/Linux:
+
+```bash
+resolvectl status
+```
+
+On Windows:
+
+```powershell
+ipconfig /all
+```
+
+Confirm both local DNS addresses are present.
+
+> **Important:** clients do not universally treat "secondary" DNS as cold standby. Some operating systems may query either server. That is why **both resolvers must block** and should use approximately the same policy.
+
+### Step 5 — Test blocking
+
+First make sure ordinary DNS works:
+
+```bash
+nslookup example.com
+```
+
+Then browse normally and check the query logs in **both** AdGuard Home and Pi-hole. You should see client requests arriving over time.
+
+If a site breaks, check the blocker log before randomly disabling lists. Find the blocked hostname, temporarily allow it, retest, and only keep the exception if it is actually required.
+
+### Step 6 — Test failure
+
+Stop AdGuard Home for a few minutes:
+
+```bash
+docker stop adguardhome
+```
+
+From a client, confirm new DNS lookups still work through Pi-hole. Then restart AdGuard Home:
+
+```bash
+docker start adguardhome
+```
+
+Repeat the test in reverse at some point. Redundancy that has never been tested is only theoretical.
+
+### Step 7 — Back up both configurations
+
+Back up the persistent AdGuard and Pi-hole directories with the rest of your application data. Also export application settings periodically if you make substantial filter or local-DNS changes.
+
+**References:** [AdGuard Home](https://github.com/AdguardTeam/AdGuardHome), [Pi-hole Docker](https://docs.pi-hole.net/docker/)
+
+---
+
+## 🌎 If You Do Not Want DNS Blocking: Pick a Good Public Resolver
+
+:::tip[ELI5]
+You do not have to run AdGuard Home or Pi-hole. At minimum, stop automatically using whatever DNS resolver your ISP handed you and choose a reputable public resolver yourself.
+:::
+
+My recommendations are simple:
+
+| Provider | Addresses | Best for | My take |
+| :--- | :--- | :--- | :--- |
+| **Quad9 Secure** | `9.9.9.9`, `149.112.112.112` | Security and privacy | **My default recommendation.** Blocks domains associated with known malicious activity and validates DNSSEC |
+| **Cloudflare 1.1.1.1** | `1.1.1.1`, `1.0.0.1` | Speed and privacy | Excellent choice when latency/performance is the priority |
+
+### Why I prefer Quad9
+
+Quad9's secure resolver adds threat blocking at the resolver itself. If a device asks for a domain Quad9 identifies as malicious, it can refuse the lookup before a connection is made.
+
+For a security-oriented homelab, that is useful even **behind** AdGuard Home or Pi-hole: your local blocker handles advertising/tracking policy and Quad9 provides an additional malicious-domain layer upstream.
+
+### Why Cloudflare is an excellent alternative
+
+Cloudflare's `1.1.1.1` is extremely fast in many locations and has explicit public-resolver privacy commitments. If you care more about raw resolver latency than upstream malware filtering, it is an excellent choice.
+
+### Why I avoid ISP DNS
+
+The ISP resolver is the default because it is convenient for the ISP, not because it is necessarily the best option for you. It also gives the ISP direct visibility into your DNS queries unless you use an encrypted DNS path.
+
+### Why I do not recommend Google Public DNS as my default
+
+Google Public DNS is technically capable and highly available, but I do not see a compelling reason to send another category of household telemetry to Google when excellent alternatives such as Quad9 and Cloudflare exist.
+
+### Configure the resolver on your router
+
+If you are **not** running a local blocker, set your router's LAN/DHCP DNS to one pair:
+
+**Security-first:**
+
+```text
+9.9.9.9
+149.112.112.112
+```
+
+**Speed-first:**
+
+```text
+1.1.1.1
+1.0.0.1
+```
+
+Do not mix one Quad9 address with one Cloudflare address unless you intentionally want inconsistent resolver behavior.
+
+Reconnect a client and verify the new settings with `resolvectl status`, `ipconfig /all`, or your operating system's network settings.
+
+**References:** [Quad9 services](https://docs.quad9.net/services/), [Cloudflare 1.1.1.1](https://developers.cloudflare.com/1.1.1.1/setup/)
+
+---
+
+## 🧠 Advanced DNS Concepts — Optional Reading
+
+:::tip[ELI5]
+If the setup above is working, you can stop. The next sections explain additional DNS architecture, encryption, recursion, segmentation, and enforcement. They are useful when you have a reason to add them; they are not prerequisites for a good home DNS setup.
+:::
+
+## 🌐 How DNS Works
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
+
+When you type a domain name, your device asks a DNS resolver for the address associated with that name. The resolver may already know the answer from cache or may ask other DNS servers until it can return an IP address. Your device then uses that address to connect to the destination.
+
+For a home network, the important part is not memorizing every step in the global DNS hierarchy. It is understanding **which resolver your devices ask first**. That is where AdGuard Home or Pi-hole can apply local filtering before passing allowed requests upstream.
 
 ---
 
 ## 🧭 The Design Goal for Home DNS
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 The objective is not to create the most complicated home network possible.
 
@@ -46,6 +367,10 @@ A good design is understandable enough that you can still troubleshoot it six mo
 ---
 
 ## 🧱 A Practical Layered Architecture
+
+:::tip[ELI5]
+A strong home-network privacy model can be represented simply: This is deliberately different from simply exposing management interfaces to the public internet.
+:::
 
 A strong home-network privacy model can be represented simply:
 
@@ -87,6 +412,10 @@ This is deliberately different from simply exposing management interfaces to the
 
 ## 🛡️ What DNS Filtering Actually Does
 
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
+
 A DNS filtering server such as **AdGuard Home** or **Pi-hole** sits between your devices and upstream DNS.
 
 When an application asks:
@@ -113,6 +442,10 @@ The major advantage is **coverage**. TVs, appliances, tablets, phones, game cons
 
 ## 🚧 What DNS Filtering Cannot Do
 
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
+
 DNS filtering should never be treated as a complete privacy or security boundary.
 
 It cannot reliably block:
@@ -136,6 +469,10 @@ This is why DNS filtering works best alongside browser protections, application 
 ---
 
 ## 🥇 Primary and Secondary DNS
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 Running two independent local DNS resolvers provides useful redundancy.
 
@@ -167,6 +504,10 @@ If one blocks telemetry and the other allows everything, filtering behavior beco
 
 ## 🔁 Keep Redundant Resolvers Consistent
 
+:::tip[ELI5]
+At minimum, keep these aligned between your DNS servers: They do not have to be byte-for-byte clones.
+:::
+
 At minimum, keep these aligned between your DNS servers:
 
 - Core blocklists
@@ -185,6 +526,10 @@ Document intentional differences so they do not later look like configuration dr
 ---
 
 ## 🧪 Test DNS Failover Before You Need It
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 Do not assume that supplying two DNS addresses means redundancy works.
 
@@ -230,6 +575,10 @@ Testing each resolver independently is much more useful than merely confirming t
 
 ## 🌐 DHCP Should Advertise Your Local DNS
 
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
+
 For most home networks, the cleanest configuration is for DHCP to automatically give clients the addresses of your local DNS resolvers.
 
 That provides:
@@ -248,6 +597,10 @@ Reconnect the device or renew DHCP before concluding that the new DNS policy is 
 ---
 
 ## 🔍 Verify the Resolver a Client Is Really Using
+
+:::tip[ELI5]
+Follow these steps in order, verify the result, and only then move to the next part of the setup.
+:::
 
 Never assume that a client is using your network DNS simply because you configured it at the router.
 
@@ -278,6 +631,10 @@ Also check the DNS dashboard itself. A query arriving from the device is strong 
 ---
 
 ## 🌎 Choosing an Upstream Resolver
+
+:::tip[ELI5]
+Your local DNS server still needs somewhere to ask for allowed domains; this section explains that next hop.
+:::
 
 Your local DNS server ultimately needs somewhere to send queries that are not already cached or answered locally.
 
@@ -310,6 +667,10 @@ Privacy policy and reliability matter more than shaving a few milliseconds from 
 ---
 
 ## 🔐 Encrypted Upstream DNS
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 Traditional DNS normally travels unencrypted between the resolver and upstream DNS server.
 
@@ -344,6 +705,10 @@ It does not eliminate trust in the endpoint.
 
 ## 🧩 Recursive DNS as an Alternative
 
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
+
 Instead of sending all requests to one public resolver, you can run your own recursive resolver using software such as Unbound.
 
 Conceptually:
@@ -373,11 +738,15 @@ Tradeoffs include:
 
 Self-hosting recursion is useful, but it is not automatically "more private" in every threat model.
 
-Use it because you understand the tradeoff, not because recursive DNS sounds inherently sovereign.
+Use it because its operational tradeoffs fit your goals, not because recursion is automatically more private or secure.
 
 ---
 
 ## ✅ DNSSEC
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 DNSSEC allows a validating resolver to verify cryptographic signatures attached to DNS data for domains that support it.
 
@@ -392,6 +761,10 @@ When your chosen resolver supports DNSSEC validation reliably, enabling it is ge
 ---
 
 ## 🕵️ Browser Secure DNS Can Bypass Network Policy
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 Modern browsers may enable their own DoH implementation.
 
@@ -429,6 +802,10 @@ The worst option is not knowing which model you are running.
 
 ## 📱 Mobile Devices May Have Similar Overrides
 
+:::tip[ELI5]
+When troubleshooting, inspect the endpoint rather than assuming the router controls everything.
+:::
+
 Phones and tablets can also bypass expected DNS through:
 
 - Private DNS settings
@@ -442,6 +819,10 @@ When troubleshooting, inspect the endpoint rather than assuming the router contr
 ---
 
 ## 📺 IoT Deserves Less Trust
+
+:::tip[ELI5]
+Smart televisions, speakers, appliances, cameras, streaming devices, and other IoT products often combine: Where your network equipment permits it, put lower-trust devices on a separate network or VLAN.
+:::
 
 Smart televisions, speakers, appliances, cameras, streaming devices, and other IoT products often combine:
 
@@ -464,6 +845,10 @@ Where your network equipment permits it, put lower-trust devices on a separate n
 ---
 
 ## 🧱 IoT Segmentation
+
+:::tip[ELI5]
+This is much stronger than merely filtering DNS.
+:::
 
 A useful policy is:
 
@@ -498,6 +883,10 @@ Add more segments only when the security benefit justifies the operational compl
 
 ## 👥 Guest Networks
 
+:::tip[ELI5]
+This section covers a network dependency or boundary you should understand before adding more complexity.
+:::
+
 Guest devices should usually have:
 
 - Internet access
@@ -513,6 +902,10 @@ Their phone, tablet, or laptop may not have the same security posture as your ow
 ---
 
 ## 🧠 Local DNS Names
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 Local DNS is useful for providing stable, readable names for internal services.
 
@@ -548,6 +941,10 @@ The network architecture can be documented without publishing its addressing pla
 
 ## 🔒 Tailscale for Private Remote Access
 
+:::tip[ELI5]
+This section explains private remote access through your tailnet rather than exposing the service directly to the internet.
+:::
+
 A private mesh VPN dramatically reduces the need to expose infrastructure directly to the internet.
 
 Tailscale is particularly useful for:
@@ -581,6 +978,10 @@ See the full [Tailscale guide](/homelab/tailscale/).
 
 ## 🧭 Tailscale DNS and MagicDNS
 
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
+
 Tailscale can also distribute DNS settings to devices on your tailnet.
 
 This can make the same private service names work both:
@@ -609,6 +1010,10 @@ Document which layer is expected to win.
 ---
 
 ## 🔀 Reverse Proxy vs VPN
+
+:::tip[ELI5]
+This section explains how one front-end service can route friendly web names to the correct internal application.
+:::
 
 A reverse proxy and a private VPN solve different problems.
 
@@ -652,6 +1057,10 @@ You get clean HTTPS URLs without opening those applications to the public intern
 
 ## 🚪 Minimize Public Exposure
 
+:::tip[ELI5]
+Do not expose services merely because they have a login screen.
+:::
+
 Do not expose services merely because they have a login screen.
 
 Administrative interfaces should generally remain private, especially:
@@ -678,6 +1087,10 @@ Prefer, in order:
 
 ## 🌍 When Public Exposure Is Necessary
 
+:::tip[ELI5]
+Some services are intentionally public.
+:::
+
 Some services are intentionally public.
 
 If an application must be internet-accessible, add defensive layers rather than pretending the risk does not exist.
@@ -702,6 +1115,10 @@ Separate those access paths where possible.
 ---
 
 ## 🚫 Hard-Coded DNS
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 Some devices ignore DHCP-provided DNS and attempt to contact public resolvers directly.
 
@@ -742,6 +1159,10 @@ The goal is predictable policy, not maximum cleverness.
 
 ## 🔐 DoH Makes Enforcement Harder
 
+:::tip[ELI5]
+Blocking direct TCP/UDP port 53 does not prevent a device from using DNS-over-HTTPS because DoH normally looks like ordinary HTTPS traffic on port 443.
+:::
+
 Blocking direct TCP/UDP port 53 does not prevent a device from using DNS-over-HTTPS because DoH normally looks like ordinary HTTPS traffic on port 443.
 
 Blocking all possible DoH endpoints is difficult and can become a permanent maintenance project.
@@ -755,6 +1176,10 @@ This is an important distinction:
 ---
 
 ## 🧯 Blocking More Is Not Always Better
+
+:::tip[ELI5]
+It is easy to become fixated on the number of blocked queries shown in a DNS dashboard.
+:::
 
 It is easy to become fixated on the number of blocked queries shown in a DNS dashboard.
 
@@ -775,6 +1200,10 @@ When something breaks, determine **why** before adding a permanent allowlist ent
 ---
 
 ## 📝 Allowlisting Discipline
+
+:::tip[ELI5]
+when only one specific subdomain is required.
+:::
 
 When you must allow a blocked domain:
 
@@ -798,6 +1227,10 @@ Today's troubleshooting exception becomes tomorrow's forgotten hole unless it is
 ---
 
 ## 📋 Blocklist Strategy
+
+:::tip[ELI5]
+Use a small number of reputable lists with clear purposes.
+:::
 
 Use a small number of reputable lists with clear purposes.
 
@@ -828,6 +1261,10 @@ A curated policy is easier to trust than a giant pile of URLs.
 
 ## 📊 DNS Logs Are Sensitive Too
 
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
+
 DNS logs reveal a surprising amount about household behavior.
 
 They can show:
@@ -853,6 +1290,10 @@ Collect enough data to troubleshoot and understand the network, not simply becau
 
 ## 🧹 Client Naming and Privacy
 
+:::tip[ELI5]
+This section explains a privacy control, what it helps with, and where its limits are.
+:::
+
 Readable client names make DNS dashboards more useful, but there is no reason to expose those names publicly.
 
 Use descriptive internal names where helpful while keeping screenshots and public documentation generalized.
@@ -871,6 +1312,10 @@ rather than publishing the actual internal hostname scheme.
 ---
 
 ## 🌐 External VPN Services Are a Separate Layer
+
+:::tip[ELI5]
+It does **not** replace: It also shifts trust from the ISP toward the VPN provider.
+:::
 
 A commercial VPN service changes the path of internet traffic:
 
@@ -906,6 +1351,10 @@ Choose accordingly.
 
 ## 🛰️ Tailscale Is Not the Same as a Commercial VPN
 
+:::tip[ELI5]
+This section explains private remote access through your tailnet rather than exposing the service directly to the internet.
+:::
+
 Tailscale is primarily a **private networking tool**, not an anonymity service.
 
 A standard Tailscale connection between your laptop and home server protects that private connection but does not automatically route all general internet traffic through another egress point.
@@ -924,6 +1373,10 @@ Using the same word "VPN" for all three causes unnecessary confusion.
 
 ## 📡 Wi-Fi Privacy Still Matters
 
+:::tip[ELI5]
+This section explains a privacy control, what it helps with, and where its limits are.
+:::
+
 DNS filtering does nothing to fix poor wireless security.
 
 Use modern Wi-Fi security where supported:
@@ -939,6 +1392,10 @@ Avoid handing visitors the credential used by trusted infrastructure simply beca
 ---
 
 ## 🧰 Troubleshooting DNS Problems
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 When an application breaks, troubleshoot methodically.
 
@@ -977,6 +1434,10 @@ Do not immediately disable an entire list or allow a parent domain.
 ---
 
 ## 🧪 A Practical Privacy Validation Routine
+
+:::tip[ELI5]
+This section explains a privacy control, what it helps with, and where its limits are.
+:::
 
 Periodically test representative devices from each trust category.
 
@@ -1021,6 +1482,10 @@ Network diagrams describe intent. Testing confirms reality.
 
 ## 📈 What to Monitor
 
+:::tip[ELI5]
+This section focuses on a signal that helps you notice a real problem before or while it affects a service.
+:::
+
 DNS infrastructure usually needs only a few meaningful health signals:
 
 - Resolver availability
@@ -1040,6 +1505,10 @@ See [Monitoring & Management](/homelab/monitoring-and-management/).
 ---
 
 ## 💾 Back Up DNS Configuration
+
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
 
 DNS infrastructure may be small, but rebuilding all of its policy from memory is annoying.
 
@@ -1062,6 +1531,10 @@ See [Backup & Recovery](/homelab/backup-and-recovery/).
 
 ## 🧯 DNS Failure Should Not Take Down the House
 
+:::tip[ELI5]
+This section explains how name lookups affect the network and what you should configure or verify.
+:::
+
 A DNS outage often looks like a complete internet failure even though connectivity is otherwise fine.
 
 Design for easy recovery:
@@ -1078,6 +1551,10 @@ The best redundant DNS server is one you have actually tested during a primary o
 ---
 
 ## 🛠️ Recommended Baseline
+
+:::tip[ELI5]
+For a practical privacy-oriented home network, a strong baseline is: This provides most of the practical benefit without turning a home network into an enterprise networking lab.
+:::
 
 For a practical privacy-oriented home network, a strong baseline is:
 
@@ -1103,6 +1580,10 @@ This provides most of the practical benefit without turning a home network into 
 ---
 
 ## ⚠️ Common Mistakes
+
+:::tip[ELI5]
+These are recurring mistakes worth checking before assuming the underlying tool is broken.
+:::
 
 ### Treating the secondary DNS server as unused standby
 
@@ -1140,6 +1621,10 @@ A simpler design that you understand is usually safer than a theoretically perfe
 
 ## 🔗 Related Guides
 
+:::tip[ELI5]
+This section explains related guides in practical terms and what it changes in the homelab.
+:::
+
 - [Tailscale VPN](/homelab/tailscale/) — private remote access
 - [Nginx Proxy Manager](/homelab/nginx-proxy-manager/) — private HTTPS and reverse proxying
 - [Docker Infrastructure Standards](/homelab/docker-infrastructure-standards/) — consistent service deployment
@@ -1149,7 +1634,11 @@ A simpler design that you understand is usually safer than a theoretically perfe
 
 ---
 
-## 🏁 Final Thought
+## ✅ What to Remember
+
+:::tip[ELI5]
+This is the short version to keep in mind after you finish the page.
+:::
 
 Good network privacy is not measured by the number of blocked domains on a dashboard.
 
