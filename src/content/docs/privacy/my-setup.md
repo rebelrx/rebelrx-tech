@@ -4,29 +4,67 @@ description: >-
   The current RebelRx hardware and infrastructure setup — personal systems, servers, AI compute, storage, networking, and backup architecture.
 ---
 
-This is the hardware and infrastructure I actually use every day.
+This is the hardware and infrastructure I actually use every day. It is included as a **real-world example**, not a shopping list or a blueprint you need to copy.
 
-It has grown considerably over time, but the goal has stayed the same: build a setup that gives me **control, performance, flexibility, and privacy** without making the environment unnecessarily fragile or difficult to maintain.
+The useful part is the pattern: everyday computers stay easy to use, persistent services live on dedicated server infrastructure, important data lives on redundant storage, less-trusted devices are segmented, DNS filtering happens at the network level, remote administration uses a private access layer, and backups exist independently of the machines being backed up.
 
-This page intentionally stays at the **system and architecture level** for general reference.
+Much of my infrastructure was built prior to the AI-driven memory price surges in 2025. Current PC pricing does significantly limit the ability to invest in self-hosted hardware. Procuring used or refurbished enterprise gear can help offset costs. Also, many self-hosted apps don't have excessive compute requirements so cheaper mini PCs or old laptops/desktops can be used.
 
-> 💡 Much of my infrastructure was built prior to the AI-driven memory price surges in 2025. Current PC pricing does
-significantly limit the ability to invest in self-hosted hardware. Procuring used or refurbished enterprise gear can help offset costs. Also, many self-hosted apps don't have excessive compute requirements so cheaper mini PCs or old laptops/desktops can be used.
+> 💡 You can implement the same design with one used mini PC, one NAS, and good backups. The number of machines is not the point.
 
 ---
 
-### 🧭 Design Philosophy
+## 🧠 ELI5: How This Setup Fits Together
 
-The setup is built around a few simple principles:
+Think of the environment as a small set of jobs rather than a pile of computers:
 
-- **Ownership** → Keep important data and infrastructure under my control when possible
-- **Separation of concerns** → Give major systems clear roles instead of making one machine responsible for everything
-- **Local-first computing** → Run workloads locally when doing so provides meaningful privacy, performance, or resilience benefits
-- **Practicality** → Use mainstream platforms when they are the best tool for the job, even when they are not my philosophical preference
-- **Scalability** → Expand individual parts of the environment without having to rebuild everything else
-- **Recoverability** → Back up configurations and irreplaceable data so hardware failure is inconvenient, not catastrophic
+| Layer | Job | Example |
+|---|---|---|
+| **Personal computers** | The machines I interact with directly | Windows desktop, Fedora desktop, Linux laptop |
+| **Application server** | Runs persistent self-hosted services | Docker host |
+| **Test environment** | Safe place to break things | Proxmox VM host |
+| **AI compute** | Runs large local models and GPU workloads | GPU workstation |
+| **AI orchestration** | Runs agents and coordinates tools/models | DGX Spark |
+| **Storage** | Keeps bulk and application data separate from compute | NAS systems |
+| **Network services** | DNS filtering and secure remote access | AdGuard Home, Pi-hole, Tailscale |
+| **Dedicated appliances** | Keeps important single-purpose services independent | Home Assistant, Roon, Bitcoin node |
+| **Backups / DR** | Provides recovery when local systems fail | Local backup + off-site copy |
 
-> 💡 This is not intended to be a blueprint everyone should copy. It is a real-world setup that evolved around my own workloads and interests.
+A much smaller version could be:
+
+```text
+Laptop / desktop
+      │
+      ├── Mini PC running Docker
+      │      ├── AdGuard Home
+      │      ├── Nextcloud
+      │      ├── Paperless-ngx
+      │      └── other apps
+      │
+      └── NAS
+             ├── files
+             └── backups
+
+Off-site backup → separate location/provider
+```
+
+That already captures most of the important architecture.
+
+---
+
+## ✅ What I Would Copy First
+
+If you are building your own environment, I would prioritize these pieces before adding specialized hardware:
+
+1. One reliable server or mini PC.
+2. A separate place for important storage.
+3. Automatic backups.
+4. A tested off-site copy for irreplaceable data.
+5. Network-wide DNS filtering if you want it.
+6. Tailscale or another private remote-access method.
+7. Only then add dedicated systems for workloads that truly benefit from isolation or more performance.
+
+This page intentionally stays at the **system and architecture level**. Detailed implementation belongs in the linked homelab guides.
 
 ---
 
@@ -387,11 +425,14 @@ You absolutely **do not need this much hardware to build a useful home lab**.
 
 This environment accumulated over years as my interests expanded from privacy and self-hosting into storage, home automation, networking, local AI, virtualization, and GPU computing.
 
-A much smaller setup can follow the same principles:
+Just follow the **separation of responsibilities**:
 
-1. Start with one reliable server.
-2. Keep good backups.
-3. Separate important storage from disposable compute when it becomes worthwhile.
-4. Add dedicated systems only when a workload actually benefits from them.
+1. Keep important data backed up independently of the computer using it.
+2. Keep experiments away from services you rely on.
+3. Use dedicated appliances only when independence or reliability justifies them.
+4. Keep private administration private instead of exposing management interfaces directly to the Internet.
+5. Document enough of the environment that you could rebuild it after a failure.
+
+If your needs are met by one mini PC and a NAS, that is a successful homelab. Add complexity only when a real workload requires it.
 
 > 🧠 The goal is not to own the most hardware. The goal is to build infrastructure that remains useful, understandable, and recoverable as your needs grow.
