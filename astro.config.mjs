@@ -71,6 +71,20 @@ export default defineConfig({
               label: 'Post-Install Baseline',
               link: '/linux/post-install-baseline/',
             },
+            {
+              label: 'Apps & Alternatives',
+              collapsed: true,
+              items: [
+                {
+                  label: 'Installing Apps on Linux',
+                  link: '/linux/installing-apps/',
+                },
+                {
+                  label: 'Open Source App Alternatives',
+                  link: '/linux/app-alternatives/',
+                },
+              ],
+            },
           ],
         },
 

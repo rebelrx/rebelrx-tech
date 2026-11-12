@@ -154,6 +154,18 @@ Best for:
 
 ---
 
+## Apps & Alternatives
+
+### [Installing Apps on Linux](/linux/installing-apps/)
+
+Learn how to find, install, update, and remove apps on Fedora, Artix, Debian, and Devuan. Covers native packages, graphical software managers, Flatpak, Flathub, and AppImages.
+
+### [Open Source App Alternatives](/linux/app-alternatives/)
+
+Find practical alternatives to Microsoft Office, Adobe apps, Outlook, Windows utilities, and other familiar software. Browse recommendations by task, review compatibility limits, and choose apps that fit your work.
+
+---
+
 ## 🔧 Post-Install
 
 ### [Linux Post-Install Baseline](/linux/post-install-baseline/)
