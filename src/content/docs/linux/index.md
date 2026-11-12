@@ -97,6 +97,14 @@ The distinction is deliberate:
 
 ---
 
+## 💾 Prepare Your Installation USB
+
+### [Create a Bootable Linux USB with Ventoy](/linux/create-bootable-usb/)
+
+Start here before any desktop or server install. Create a reusable multiboot USB from Windows or Linux, verify ISO downloads, use UEFI, and review the Secure Boot disabled baseline and its security tradeoffs. Includes updates, troubleshooting, and dedicated-media alternatives.
+
+---
+
 ## 🖥️ Desktop Guides
 
 ### [Artix Linux Manual Installation](/linux/artix-kde-openrc-install/)

@@ -36,12 +36,12 @@ Recommended firmware/BIOS settings:
 - Use **UEFI**, not Legacy/CSM mode
 - Enable **SVM/AMD-V** or **Intel VT-x** if you use virtualization
 - Enable **IOMMU** if you expect to use PCIe passthrough later
-- Leave **Secure Boot enabled** unless you have a specific reason to disable it
+- **Secure Boot: Disabled (recommended for this guide)**
 - Update the motherboard/laptop firmware before installing when practical
 
 Back up anything important before repartitioning or replacing an existing OS.
 
-For an NVIDIA server, whether Secure Boot remains enabled depends on how the proprietary kernel module will be installed and signed. Do not disable it reflexively; decide based on the actual driver workflow.
+These instructions use **Secure Boot disabled** to simplify Ventoy and third-party kernel-module setup. Disabling it removes boot-integrity protection. NVIDIA drivers can also work with Secure Boot through signed modules and trusted keys. Read the [security tradeoffs and Windows/BitLocker precautions](/linux/create-bootable-usb/#4-prepare-firmware-uefi-and-secure-boot) before changing firmware.
 
 :::tip[Keep Fedora simple]
 Unlike the Artix manual installation, the point of this guide is not to rebuild Fedora's defaults by hand. Fedora's installer, Btrfs layout, zram configuration, SELinux policy, and firewall defaults are all sensible. Start with those defaults and customize only where there is a clear benefit.
@@ -67,32 +67,11 @@ Fedora's download page provides the current verification commands for the exact 
 
 ## 📥 3. Create a Bootable USB
 
-### Fedora Media Writer
+Follow [Create a Bootable Linux USB with Ventoy](/linux/create-bootable-usb/) to prepare the USB from Windows or Linux, authenticate and verify the ISO, and copy the verified **Fedora KDE x86_64 Live** image to the large Ventoy partition. Ventoy is the recommended reusable multiboot method; do not raw-write the ISO over a Ventoy USB you want to keep.
 
-Fedora Media Writer is the easiest supported option and is available for Linux, Windows, and macOS.
+Choose the **UEFI** USB entry, select the ISO in Ventoy, and try **Boot in normal mode** first. Confirm `/sys/firmware/efi` exists in the Linux environment before partitioning.
 
-### Ventoy
-
-Ventoy is useful if you maintain a multi-ISO USB drive.
-
-### Linux `dd`
-
-First identify the USB device:
-
-```bash
-lsblk
-```
-
-Then write the ISO to the whole USB device — **not a partition**:
-
-```bash
-sudo dd if=fedora-kde.iso \
-  of=/dev/sdX bs=4M status=progress oflag=sync
-```
-
-:::danger
-Replace `fedora-kde.iso` with the exact verified download filename. Do not put a wildcard inside `if=...`. Double-check `/dev/sdX`. `dd` will overwrite the target without asking.
-:::
+If Ventoy is incompatible with your hardware, use the shared guide's [dedicated-media alternatives](/linux/create-bootable-usb/#11-alternatives-a-dedicated-single-image-usb).
 
 ---
 
@@ -326,9 +305,7 @@ nvidia-smi
 
 ### Secure Boot
 
-Secure Boot can remain enabled, but third-party kernel modules must be signed with a trusted Machine Owner Key (MOK).
-
-RPM Fusion documents the supported signing/enrollment process. Follow its current Secure Boot instructions rather than disabling Secure Boot by default.
+This guide uses **Secure Boot disabled** as its baseline. NVIDIA hardware does not require it to be off: if you choose to enable Secure Boot, third-party kernel modules must be signed and trusted. Follow [RPM Fusion's Secure Boot instructions](https://rpmfusion.org/Howto/Secure%20Boot) for its supported signing/enrollment process before enabling it.
 
 :::caution
 After installing or upgrading NVIDIA kernel modules, do not immediately power off while akmods is still compiling. Check the build state first if you are unsure.
@@ -656,7 +633,7 @@ A clean Fedora KDE workstation should end up with:
 - UEFI boot
 - Fedora's default Btrfs layout
 - zram
-- Secure Boot retained where practical
+- Secure Boot disabled for this guide's baseline, with the security tradeoff understood
 - SELinux enforcing
 - firewalld active
 - RPM Fusion enabled only where needed

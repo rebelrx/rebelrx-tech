@@ -21,13 +21,15 @@ Before you begin:
 
 - Ensure BIOS is set to UEFI (not legacy)
 - Enable virtualization (SVM/VT-x)
-- Check Devuan's current Secure Boot support before installation; NVIDIA module signing is a separate consideration
+- **Secure Boot: Disabled (recommended for this guide)**
+
+These instructions use **Secure Boot disabled** to simplify Ventoy and third-party kernel-module setup. Disabling it removes boot-integrity protection. NVIDIA drivers can also work with Secure Boot through signed modules and trusted keys. Read the [security tradeoffs and Windows/BitLocker precautions](/linux/create-bootable-usb/#4-prepare-firmware-uefi-and-secure-boot) before changing firmware.
 
 * * *
 
 <a id="1-download-devuan-and-create-a-bootable-iso"></a>
 
-## 📥 1\. Download Devuan and Create a Bootable ISO
+## 📥 1\. Download Devuan and Create a Bootable USB
 
 Download Devuan Excalibur from [files.devuan.org/](https://files.devuan.org/)
 
@@ -35,15 +37,11 @@ Download Devuan Excalibur from [files.devuan.org/](https://files.devuan.org/)
 - Choose installer_iso
 - Download the \_netinstall ISO
 
-Create a bootable ISO with USB. PulsarTECH has a great Ventoy + Linux multi-boot USB guide available at: [youtube.com/watch?v=BfjLJ0CqWsY](https://www.youtube.com/watch?v=BfjLJ0CqWsY)
+Follow [Create a Bootable Linux USB with Ventoy](/linux/create-bootable-usb/) to prepare the USB from Windows or Linux, authenticate and verify the ISO, and copy the verified **Devuan amd64 netinstall** image to the large Ventoy partition. Ventoy is the recommended reusable multiboot method; do not raw-write the ISO over a Ventoy USB you want to keep.
 
-Verify the ISO using the release's published checksums/signatures. Replace `devuan-netinstall.iso` with the exact filename. Identify the USB with `lsblk`; writing the ISO erases that device.
+Choose the **UEFI** USB entry, select the ISO in Ventoy, and try **Boot in normal mode** first. Confirm `/sys/firmware/efi` exists in the Linux environment before partitioning.
 
-On Linux:
-
-```bash
-sudo dd if=devuan-netinstall.iso of=/dev/sdX bs=4M status=progress conv=fsync
-```
+If Ventoy is incompatible with your hardware, use the shared guide's [dedicated-media alternatives](/linux/create-bootable-usb/#11-alternatives-a-dedicated-single-image-usb).
 
 <a id="2-boot-the-installer-iso"></a>
 

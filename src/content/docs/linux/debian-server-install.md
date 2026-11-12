@@ -35,10 +35,10 @@ Recommended firmware settings:
 - **Legacy/CSM** disabled unless specifically required
 - **SVM/AMD-V** or **Intel VT-x** enabled
 - **IOMMU** enabled if PCIe passthrough may be used
-- **Secure Boot** may remain enabled for a normal Debian install, but you can disable it if needed
+- **Secure Boot: Disabled (recommended for this guide)**
 - Update BIOS/UEFI firmware before installation when practical
 
-For an NVIDIA server, whether Secure Boot remains enabled depends on how the proprietary kernel module will be installed and signed. Do not disable it reflexively; decide based on the actual driver workflow.
+These instructions use **Secure Boot disabled** to simplify Ventoy and third-party kernel-module setup. Disabling it removes boot-integrity protection. NVIDIA drivers can also work with Secure Boot through signed modules and trusted keys. Read the [security tradeoffs and Windows/BitLocker precautions](/linux/create-bootable-usb/#4-prepare-firmware-uefi-and-secure-boot) before changing firmware.
 
 ---
 
@@ -58,22 +58,11 @@ Verify the downloaded image using Debian's published checksums/signatures before
 
 ## 📥 3. Create a Bootable USB
 
-Using Linux:
+Follow [Create a Bootable Linux USB with Ventoy](/linux/create-bootable-usb/) to prepare the USB from Windows or Linux, authenticate and verify the ISO, and copy the verified **Debian amd64 netinst** image to the large Ventoy partition. Ventoy is the recommended reusable multiboot method; do not raw-write the ISO over a Ventoy USB you want to keep.
 
-```bash
-lsblk
-```
+Choose the **UEFI** USB entry, select the ISO in Ventoy, and try **Boot in normal mode** first. Confirm `/sys/firmware/efi` exists in the Linux environment before partitioning.
 
-Identify the USB device, then write the ISO to the whole device:
-
-```bash
-sudo dd if=debian-netinst.iso \
-  of=/dev/sdX bs=4M status=progress conv=fsync
-```
-
-Ventoy is also a good option for a reusable multi-ISO USB drive.
-
-Replace `debian-netinst.iso` with the exact verified download filename. Shell wildcards embedded in `if=...` do not reliably expand as intended. The command erases the whole target USB device; confirm its identity with `lsblk` first.
+If Ventoy is incompatible with your hardware, use the shared guide's [dedicated-media alternatives](/linux/create-bootable-usb/#11-alternatives-a-dedicated-single-image-usb).
 
 ---
 

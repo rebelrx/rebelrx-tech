@@ -38,6 +38,7 @@ export default defineConfig({
           items: [
             { label: 'Overview', link: '/linux/' },
             { label: 'Why Linux', link: '/linux/why-linux/' },
+            { label: 'Create a Bootable USB', link: '/linux/create-bootable-usb/' },
             {
               label: 'Desktop Installation',
               collapsed: false,

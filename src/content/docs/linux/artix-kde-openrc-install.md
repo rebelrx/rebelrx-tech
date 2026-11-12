@@ -25,15 +25,17 @@ The general steps for installing Artix (similar to most Linux distributions) inc
 
 ## 🧭 1\. Boot the Live ISO
 
-Download the base OpenRC ISO from [artixlinux.org/download.php](https://artixlinux.org/download.php). Flash it to a USB drive
+Download the base OpenRC x86_64 ISO from [artixlinux.org/download.php](https://artixlinux.org/download.php).
 
-- PulsarTECH has a great Ventoy + Linux multi-boot USB guide available at: [youtube.com/watch?v=BfjLJ0CqWsY](https://www.youtube.com/watch?v=BfjLJ0CqWsY)
+**Firmware baseline:** UEFI enabled, Legacy/CSM disabled, **Secure Boot disabled (recommended for this guide)**.
 
-Linux command for USB:
+These instructions use **Secure Boot disabled** to simplify Ventoy and third-party kernel-module setup. Disabling it removes boot-integrity protection. NVIDIA drivers can also work with Secure Boot through signed modules and trusted keys. Read the [security tradeoffs and Windows/BitLocker precautions](/linux/create-bootable-usb/#4-prepare-firmware-uefi-and-secure-boot) before changing firmware.
 
-```bash
-sudo dd bs=4M if=artix-base-openrc-YYYYMMDD-x86_64.iso of=/dev/sdX status=progress oflag=sync
-```
+Follow [Create a Bootable Linux USB with Ventoy](/linux/create-bootable-usb/) to prepare the USB from Windows or Linux, authenticate and verify the ISO, and copy the verified **Artix base OpenRC x86_64** image to the large Ventoy partition. Ventoy is the recommended reusable multiboot method; do not raw-write the ISO over a Ventoy USB you want to keep.
+
+Choose the **UEFI** USB entry, select the ISO in Ventoy, and try **Boot in normal mode** first. Confirm `/sys/firmware/efi` exists in the Linux environment before partitioning.
+
+If Ventoy is incompatible with your hardware, use the shared guide's [dedicated-media alternatives](/linux/create-bootable-usb/#11-alternatives-a-dedicated-single-image-usb).
 
 Boot the PC from USB. Here's a reference list of Boot Menu keys for various manufacturers:
 
